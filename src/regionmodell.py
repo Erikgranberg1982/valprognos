@@ -45,6 +45,34 @@ REGION_SPARR = 0.03
 PSU_VIKT = float(cfg._P.get("psu_vikt", 0.25))
 
 
+# Valet som prognosen utgår från.
+FORRA_VALET = "2022"
+
+# ÖVRIGA är inte ett parti utan summan av flera lokala partier. Ett samlat stöd
+# strax över spärren betyder oftast att inget enskilt parti klarar den. Tröskeln
+# är kalibrerad mot regionvalet 2022, där den sänkte det totala mandatfelet för
+# ÖVRIGA från 21 till 5 mandat över alla regioner.
+OVRIGA_EFFEKTIV_SPARR = 5.0
+
+
+def _rikstrend(riksprognos: pd.Series) -> dict[str, float]:
+    """Kvoten mellan riksdagsprognosen och riksdagsvalet 2022, per parti.
+
+    Kvoten uttrycker hur mycket ett parti vuxit eller krympt nationellt sedan
+    förra valet, och används för att skala områdenas egna resultat.
+    """
+    ut = {}
+    for parti in cfg.PARTIER:
+        forra = cfg.VALRESULTAT_2022.get(parti)
+        nu = riksprognos.get(parti)
+        if forra and nu is not None and forra > 0:
+            ut[parti] = float(nu) / float(forra)
+        else:
+            ut[parti] = 1.0
+    return ut
+
+
+
 def skatta_differenser(vikt_2022: float = 0.7) -> pd.DataFrame:
     """Skattar differensen mellan regionval och riksdagsval per region och parti.
 
@@ -153,43 +181,50 @@ def prognos_per_region(riksprognos: pd.Series, anvand_psu: bool = True,
                        lokala_konstanta: bool = True) -> pd.DataFrame:
     """Bygger regionvalsprognos per region.
 
-    riksprognos är riksdagsprognosen i procent per parti. Resultatet innehåller
-    en rad per region med prognos per parti inklusive ÖVRIGA, normaliserat till
-    hundra procent.
+    Utgångspunkten är regionens eget resultat i förra regionvalet, skalat med
+    hur mycket partiet gått upp eller ner nationellt sedan dess. Ett parti som
+    fått 3,0 procent i regionen och sedan vuxit från 5,3 till 6,5 nationellt
+    hamnar på 3,0 x 6,5/5,3, alltså 3,7 procent.
+
+    Metoden valdes efter jämförelse mot regionvalet 2022. Ett tidigare upplägg
+    skalade rikstrenden med regionens profil och adderade skillnaden mellan
+    region- och riksdagsval. Det gav 1,49 procentenheters medelabsolutfel mot
+    1,18 för den nuvarande, och kunde dessutom producera orimliga nivåer när
+    profil och skillnad pekade åt samma håll: ett parti med tre gånger rikets
+    stöd i en region blåstes upp så att radsumman överskred hundra procent och
+    normaliseringen tryckte ner alla andra partier.
+
+    Att utgå från det faktiska lokalvalsresultatet fångar dessutom automatiskt
+    det som skillnadstermen försökte modellera, nämligen att väljare röstar
+    annorlunda i lokalvalen.
+
+    riksprognos är riksdagsprognosen i procent per parti.
     """
-    differenser = skatta_differenser()
-    profil = regional_profil(anvand_psu=anvand_psu)
-    regionval_2022 = scb_data.hamta_regionval(ar=["2022"])
-    regionval_2022 = (regionval_2022.reset_index()
-                      .set_index("omrade").drop(columns=["ar"]))
+    forra_lokalt = scb_data.hamta_regionval(ar=[FORRA_VALET])
+    forra_lokalt = (forra_lokalt.reset_index()
+                    .set_index("omrade").drop(columns=["ar"]))
+    trend = _rikstrend(riksprognos)
 
     rader = []
     for omrade in scb_data.REGIONER:
-        if omrade not in differenser.index or omrade not in profil.index:
+        if omrade not in forra_lokalt.index:
             continue
 
         post = {"omrade": omrade, "namn": scb_data.REGIONER[omrade]}
         for parti in cfg.PARTIER:
-            if parti not in riksprognos.index:
+            if parti not in forra_lokalt.columns:
                 continue
-            # Steg 1 och 2: rikstrend skalad med regionens profil.
-            faktor = profil.at[omrade, parti] if parti in profil.columns else 1.0
-            if not np.isfinite(faktor) or faktor <= 0:
-                faktor = 1.0
-            regionalt_riksdagsstod = riksprognos[parti] * faktor
+            bas = forra_lokalt.at[omrade, parti]
+            if not np.isfinite(bas):
+                bas = 0.05
+            post[parti] = max(0.05, float(bas) * trend.get(parti, 1.0))
 
-            # Steg 3: differensen mellan regionval och riksdagsval.
-            delta = differenser.at[omrade, parti] if parti in differenser.columns else 0.0
-            if not np.isfinite(delta):
-                delta = 0.0
-            post[parti] = max(0.05, regionalt_riksdagsstod + delta)
-
-        # Lokala partier hålls på sin nivå från förra regionvalet.
-        if lokala_konstanta and "ÖVRIGA" in regionval_2022.columns:
-            ovriga = regionval_2022.at[omrade, "ÖVRIGA"] if omrade in regionval_2022.index else np.nan
-            post["ÖVRIGA"] = float(ovriga) if np.isfinite(ovriga) else 3.0
-        else:
-            post["ÖVRIGA"] = 3.0
+        # Lokala partier hålls på sin nivå från förra valet, eftersom SCB
+        # redovisar dem samlat och de inte kan prognosticeras var för sig.
+        ovriga = np.nan
+        if lokala_konstanta and "ÖVRIGA" in forra_lokalt.columns:
+            ovriga = forra_lokalt.at[omrade, "ÖVRIGA"]
+        post["ÖVRIGA"] = float(ovriga) if np.isfinite(ovriga) else 3.0
 
         rader.append(post)
 
@@ -198,14 +233,6 @@ def prognos_per_region(riksprognos: pd.Series, anvand_psu: bool = True,
     summa = df[partikolumner].sum(axis=1)
     df[partikolumner] = df[partikolumner].div(summa, axis=0) * 100
     return _dela_ut_lokala_partier(df, "region", partikolumner)
-
-
-# ÖVRIGA är inte ett parti utan summan av flera lokala partier. Ett samlat stöd
-# strax över spärren betyder oftast att inget enskilt parti klarar den. Tröskeln
-# nedan är kalibrerad mot regionvalet 2022: under den får ÖVRIGA inga mandat,
-# vilket rättar de fall där modellen annars gav Uppsala och Västra Götaland
-# mandat som i verkligheten inte fanns.
-OVRIGA_EFFEKTIV_SPARR = 5.0
 
 
 def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,

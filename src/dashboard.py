@@ -331,70 +331,67 @@ def _metod_lokal() -> str:
 
 <div class="metodkort">
   <p class="metodingress">Det finns inga publicerade opinionsmätningar för
-  region- och kommunvalen. Prognosen härleds därför ur riksdagsprognosen i tre
-  steg, och osäkerheten är omkring dubbelt så stor som för riksdagsvalet.</p>
+  region- och kommunvalen. Prognosen bygger därför på områdets eget resultat i
+  förra lokalvalet, skalat med rikstrenden. Osäkerheten är omkring dubbelt så
+  stor som för riksdagsvalet.</p>
 
   <div class="metodsteg">
     <div class="steg">
       <div class="stegnr">1</div>
       <div class="stegtext">
-        <strong>Rikstrenden</strong>
-        <p>Utgångspunkten är riksdagsprognosen: {len(cfg.PARTIER)} partier,
-        viktade opinionsmätningar justerade för husfaktorer.</p>
+        <strong>Områdets eget förra resultat</strong>
+        <p>Utgångspunkten är hur området faktiskt röstade i förra lokalvalet.
+        Det fångar automatiskt att väljare röstar annorlunda i kommun- och
+        regionval än i riksdagsvalet, och att lokala partier är starka på vissa
+        håll.</p>
       </div>
     </div>
     <div class="steg">
       <div class="stegnr">2</div>
       <div class="stegtext">
-        <strong>Områdets profil</strong>
-        <p>En multiplikator per parti som anger hur mycket starkare eller
-        svagare partiet är i området än i riket, byggd på områdets eget
-        riksdagsvalsresultat 2022.</p>
-        <p>För <strong>regionvalet</strong> vägs {psu_procent:.0f} procent in
-        från SCB:s partisympatiundersökning per landsdel, så att profilen följer
-        hur opinionen rört sig sedan dess. För <strong>kommunvalet</strong>
-        används den inte: landsdelarna är för grova för en enskild kommun, och
-        ett backtest visar att den försämrar prognosen där.</p>
+        <strong>Rikstrenden sedan dess</strong>
+        <p>Varje parti skalas med hur mycket det gått upp eller ner nationellt.
+        Ett parti som fått 2,3 procent i en kommun och sedan vuxit från 5,3 till
+        6,5 procent i riket hamnar på 2,3 × 6,5/5,3, alltså 2,8 procent.</p>
       </div>
     </div>
     <div class="steg">
       <div class="stegnr">3</div>
       <div class="stegtext">
-        <strong>Skillnaden mellan lokalval och riksdagsval</strong>
-        <p>Väljare röstar systematiskt annorlunda i lokalvalen. Skillnaden
-        skattas per område från valen 2018 och 2022, med tyngdpunkt på det
-        senare. Det är steget som gör mest skillnad.</p>
+        <strong>Lokala partier och mandat</strong>
+        <p>Lokala partier hålls på förra valets nivå. För
+        <strong>regionvalet</strong> vägs {psu_procent:.0f} procent in från
+        SCB:s partisympatiundersökning per landsdel; för kommunvalet används
+        den inte, eftersom landsdelarna är för grova för en enskild kommun.
+        Mandaten fördelas sedan med jämkade uddatalsmetoden.</p>
       </div>
     </div>
   </div>
 
   <table class="metodtabell">
-    <thead><tr><th>Parti</th><th class="tal">Regionval mot riksdagsval</th>
-      <th class="tal">Stabilitet mellan valen</th></tr></thead>
+    <thead><tr><th>Metod</th><th class="tal">Regionval</th>
+      <th class="tal">Kommunval</th></tr></thead>
     <tbody>
-      <tr><td><strong>SD</strong></td><td class="tal neg">−6,4</td>
-        <td class="tal">0,81</td></tr>
-      <tr><td><strong>Lokala partier</strong></td><td class="tal pos">+4,0</td>
-        <td class="tal">0,61</td></tr>
-      <tr><td><strong>V</strong></td><td class="tal pos">+1,5</td>
-        <td class="tal">0,61</td></tr>
-      <tr><td><strong>KD</strong></td><td class="tal pos">+1,1</td>
-        <td class="tal">0,85</td></tr>
-      <tr><td><strong>C</strong></td><td class="tal pos">+0,4</td>
-        <td class="tal">0,86</td></tr>
+      <tr><td><strong>Områdets resultat × rikstrend</strong></td>
+        <td class="tal pos">1,18</td><td class="tal pos">1,95</td></tr>
+      <tr><td>Rikstrend × profil + skillnad</td>
+        <td class="tal">1,49</td><td class="tal">2,40</td></tr>
     </tbody>
   </table>
-  <p class="metodnot">Skillnaden i procentenheter, medel över regionerna.
-  Stabiliteten är korrelationen mellan områdenas skillnad 2018 och 2022: höga
-  värden betyder att mönstren är genuina och därför går att extrapolera, inte
-  att de är slumpmässigt brus.</p>
+  <p class="metodnot">Medelabsolutfel i procentenheter, uppmätt genom att
+  förutsäga valet 2022 med enbart data från 2018. Den första metoden används.
+  Den andra prövades först men var både mindre träffsäker och kunde ge orimliga
+  nivåer: ett parti med tre gånger rikets stöd i ett område kunde skalas upp så
+  att radsumman överskred hundra procent, varpå normaliseringen tryckte ner
+  alla andra partier. Det gjorde att ett parti kunde tappa lokalt trots att det
+  gick fram nationellt.</p>
 
   <div class="metodrutor">
     <div class="metodruta">
       <div class="mrubrik">Träffsäkerhet</div>
-      <p>Ett test där bara 2018 års skillnad används för att förutsäga valet
-      2022 ger ett medelabsolutfel på <strong>1,5 procentenheter</strong> för
-      regionvalet och <strong>2,4</strong> för kommunvalet. Riksdagsprognosen
+      <p>Ett test där bara 2018 års data används för att förutsäga valet 2022
+      ger ett medelabsolutfel på <strong>1,2 procentenheter</strong> för
+      regionvalet och <strong>2,0</strong> för kommunvalet. Riksdagsprognosen
       ligger på 0,6 nära valdagen. Kommunerna är svårast: de är minst, och
       lokala förhållanden väger tyngst där.</p>
     </div>

@@ -139,45 +139,38 @@ def prognos_per_kommun(riksprognos: pd.Series,
                        kommuner: list[str] | None = None) -> pd.DataFrame:
     """Bygger kommunvalsprognos per kommun.
 
-    Samma tre steg som regionmodellen: rikstrend, regional profil från
-    kommunens eget riksdagsvalsresultat, och differensen mellan kommunval och
-    riksdagsval.
+    Samma princip som regionmodellen: kommunens eget resultat i förra
+    kommunvalet skalas med hur mycket partiet gått upp eller ner nationellt.
+    Se regionmodell.prognos_per_region för varför metoden valdes.
+
+    Kommunprognosen är osäkrare än regionprognosen. Kommunerna är mindre, och
+    lokala förhållanden som ett avhopp eller en ny lista väger tyngre där.
     """
-    differenser = skatta_differenser()
-    riksdagsval = scb_data.hamta_riksdagsval_per_kommun(ar=["2022"])
-    riksdagsval = (riksdagsval.reset_index().set_index("omrade").drop(columns=["ar"]))
-    kommunval_2022 = scb_data.hamta_kommunval(ar=["2022"])
-    kommunval_2022 = (kommunval_2022.reset_index()
-                      .set_index("omrade").drop(columns=["ar"]))
-
-    riket = riksdagsval.mean()
-    profil = riksdagsval.div(riket, axis=1)
-    if PSU_VIKT_KOMMUN > 0:
-        profil = _blanda_in_psu(profil)
-
+    forra_lokalt = scb_data.hamta_kommunval(ar=[regionmodell.FORRA_VALET])
+    forra_lokalt = (forra_lokalt.reset_index()
+                    .set_index("omrade").drop(columns=["ar"]))
+    trend = regionmodell._rikstrend(riksprognos)
     namn = scb_data.kommunnamn()
-    urval = kommuner or [k for k in differenser.index if k in profil.index]
+
+    urval = kommuner or list(forra_lokalt.index)
 
     rader = []
     for omrade in urval:
-        if omrade not in differenser.index or omrade not in profil.index:
+        if omrade not in forra_lokalt.index:
             continue
-        post = {"omrade": omrade, "namn": namn.get(omrade, omrade)}
-        for parti in cfg.PARTIER:
-            if parti not in riksprognos.index:
-                continue
-            faktor = profil.at[omrade, parti] if parti in profil.columns else 1.0
-            if not np.isfinite(faktor) or faktor <= 0:
-                faktor = 1.0
-            delta = differenser.at[omrade, parti] if parti in differenser.columns else 0.0
-            if not np.isfinite(delta):
-                delta = 0.0
-            post[parti] = max(0.05, riksprognos[parti] * faktor + delta)
 
-        # Lokala partier hålls konstanta på förra valets nivå.
+        post = {"omrade": omrade, "namn": namn.get(omrade, str(omrade))}
+        for parti in cfg.PARTIER:
+            if parti not in forra_lokalt.columns:
+                continue
+            bas = forra_lokalt.at[omrade, parti]
+            if not np.isfinite(bas):
+                bas = 0.05
+            post[parti] = max(0.05, float(bas) * trend.get(parti, 1.0))
+
         ovriga = np.nan
-        if omrade in kommunval_2022.index and "ÖVRIGA" in kommunval_2022.columns:
-            ovriga = kommunval_2022.at[omrade, "ÖVRIGA"]
+        if "ÖVRIGA" in forra_lokalt.columns:
+            ovriga = forra_lokalt.at[omrade, "ÖVRIGA"]
         post["ÖVRIGA"] = float(ovriga) if np.isfinite(ovriga) else 5.0
         rader.append(post)
 
