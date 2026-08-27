@@ -7,3 +7,9 @@ __pycache__/
 data/scb/
 data/wikipedia_cache_*.html
 output/
+
+# Hemligheter. Får aldrig versionshanteras.
+.env
+.env.*
+*.pem
+*.key
