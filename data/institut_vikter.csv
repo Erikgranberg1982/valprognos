@@ -1,0 +1,9 @@
+institut,vikt,typiskt_urval,metod,kommentar
+SCB,1.35,9000,telefon+webb,Partisympatiundersökningen. Mycket stort urval men bara två mätningar per år.
+Novus,1.2,1800,webbpanel,Rekryterad slumpmässig panel. Historiskt god träffsäkerhet.
+Verian,1.20,1600,telefon+webb,Tidigare Kantar Sifo.
+Demoskop,1.05,1600,webbpanel,
+Ipsos,1.2,1500,telefon+webb,Mäter för Dagens Nyheter.
+Indikator,1.2,1400,webbpanel,
+Skop,0.50,1200,telefon,Glesa mätningar.
+Sentio,0.50,1000,webbpanel,Redovisar avrundade heltal. Historiskt större avvikelser.

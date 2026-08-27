@@ -1,0 +1,9 @@
+
+# Byggd sida. Publiceras av GitHub Actions, behöver inte versionshanteras.
+# Cachade svar från Wikipedia och SCB. Hämtas om vid behov och är stora.
+*.pyc
+.DS_Store
+__pycache__/
+data/scb/
+data/wikipedia_cache_*.html
+output/

@@ -1,0 +1,12 @@
+parameter,varde,kommentar
+halveringstid_dagar,21,Antal dagar innan en mätnings tidsvikt halveras. Med 21 dagar behåller en mätning cirka 79 procent av sin vikt per vecka. Lägre värde gör prognosen mer reaktiv men bygger på färre effektiva mätningar.
+max_alder_dagar,365,Mätningar äldre än så här exkluderas helt.
+husfaktor_fonster_dagar,540,Tidsfönster bakåt för att skatta husfaktorer per institut.
+husfaktor_dampning,0.75,Andel av skattad husfaktor som faktiskt korrigeras bort. 1.0 = full korrigering.
+min_matningar_husfaktor,4,Minsta antal mätningar innan husfaktor skattas för ett institut.
+nationellt_fel_sd,0.005,Korrelerat blockfel per parti. Kalibrerat mot valet 2022 där blockfelet var cirka 1.5 procentenheter.
+partifel_sd,0.0113,Partispecifikt oberoende fel. Kalibrerat mot observerat medelabsolutfel 0.64 pe nära valdagen.
+trend_drift_sd_per_manad,0.0130,Extra osäkerhet per kvadratrot-månad kvar till valdagen. Kalibrerat så att 80-procentsintervallen täcker utfallet 2022 i 82 procent av fallen. Bygger på ett enda val och bör ses över när fler valcykler finns i underlaget.
+antal_simuleringar,40000,Antal Monte Carlo-dragningar.
+anvand_valdagskorrigering,0,Sätt till 1 för att aktivera den historiska valdagskorrigeringen i data/valdagskorrigering.csv. Avstängd som standard eftersom den bygger på ett enda val och riskerar att befästa 2022-cykelns särdrag.
+psu_vikt,0.25,Hur mycket SCB:s regionala partisympati väger mot den historiska profilen i region- och kommunprognosen. Kalibrerat mot regionvalet 2022 där 0.25 gav lägsta felet. Ren PSU är sämre eftersom landsdelarna är för grova.

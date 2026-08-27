@@ -1,0 +1,64 @@
+name: Bygg och publicera valprognos
+
+on:
+  schedule:
+    # Klockan 05:10 UTC varje dag, alltså strax efter att nattens
+    # opinionsmätningar hunnit publiceras på Wikipedia.
+    - cron: "10 5 * * *"
+  workflow_dispatch:      # Går även att köra manuellt från Actions-fliken.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Avbryt en pågående körning om en ny startas, så att inte två bygg
+# publicerar samtidigt.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  bygg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installera beroenden
+        run: pip install -r requirements.txt
+
+      - name: Hämta mätningar och bygg prognosen
+        run: |
+          cd src
+          python3 prognos.py --hamta
+
+      - name: Kontrollera att bygget gav rimligt resultat
+        run: python3 scripts/kontrollera.py
+
+      - name: Spara mätningarna som artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: matningar
+          path: data/matningar.csv
+          retention-days: 30
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: output
+
+  publicera:
+    needs: bygg
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
