@@ -1,5 +1,8 @@
-pandas>=1.5
-numpy>=1.23
-requests>=2.28
-beautifulsoup4>=4.11
-lxml>=4.9
+# Övre gränser sätts för att byggmiljön inte ska hämta en framtida version med
+# ändrat beteende. Byggen som kör dagligen under en valrörelse ska vara
+# förutsägbara, inte hämta senaste allt.
+pandas>=1.5,<3
+numpy>=1.23,<3
+requests>=2.28,<3
+beautifulsoup4>=4.11,<5
+lxml>=4.9,<6

@@ -115,6 +115,22 @@ def _tolka_urval(soup_rad) -> int | None:
     return None
 
 
+def _las_tabell(html: str):
+    """Läser en HTML-tabell till en DataFrame.
+
+    Från pandas 2.1 tolkas en rå HTML-sträng som ett filnamn och måste lindas i
+    StringIO. Äldre versioner accepterar strängen direkt. Funktionen hanterar
+    båda, så att koden fungerar likadant lokalt och i byggmiljön.
+    """
+    from io import StringIO
+
+    try:
+        tabeller = pd.read_html(StringIO(html))
+    except (TypeError, ValueError):
+        tabeller = pd.read_html(html)
+    return tabeller[0] if tabeller else None
+
+
 def _platta_kolumner(kolumner) -> list[str]:
     """Plattar ut Wikipedias flernivåheader till partikoder.
 
@@ -192,8 +208,10 @@ def skrapa(valar: int = 2026) -> pd.DataFrame:
 
         # Läs tabellen med pandas för robust cellhantering.
         try:
-            df = pd.read_html(str(tabell))[0]
+            df = _las_tabell(str(tabell))
         except (ValueError, IndexError):
+            continue
+        if df is None:
             continue
         if df.shape[1] < 9:
             continue
