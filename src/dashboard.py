@@ -305,10 +305,12 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
 
   <div id="lokaloversikt">
     <div class="styrerad" id="styrerad"></div>
+    <div class="klicktips" id="klicktips"></div>
     <div class="tabellwrap"><table>
       <thead><tr><th>Område</th>{partihuvud}
         <th class="tal">Mandat</th><th class="tal">V-block</th>
-        <th class="tal">H-block</th><th class="tal">Övr</th><th>Styre</th></tr></thead>
+        <th class="tal">H-block</th><th class="tal">Övr</th><th>Styre</th>
+        </tr></thead>
       <tbody id="lokalkropp"></tbody>
     </table></div>
     <div class="notis" id="lokalnotis"></div>
@@ -877,8 +879,26 @@ canvas {{ width:100%; height:auto; display:block; }}
 .sokruta:focus {{ outline:none; border-color:var(--korall); }}
 .laddar {{ text-align:center; color:var(--svag); padding:26px 12px;
   font-size:13.5px; }}
+/* Raderna är klickbara. Eftersom hover inte finns på touchskärmar markeras
+   det med en pil i sista kolumnen och en uppmaning ovanför tabellen. */
 tr.klickbar {{ cursor:pointer; }}
-tr.klickbar:hover .inst {{ color:var(--korall); }}
+tr.klickbar:hover {{ background:var(--korall-ljus); }}
+tr.klickbar:hover .inst {{ color:var(--korall-mork); }}
+tr.klickbar:focus-visible {{ outline:2px solid var(--korall); outline-offset:-2px; }}
+/* Pilen sitter intill områdesnamnet i stället för i en egen kolumn längst
+   till höger. Tabellen är bredare än sin behållare och scrollar horisontellt,
+   så en kolumn där hade legat utanför synfältet. */
+.radpil {{ display:inline-flex; margin-left:7px; color:var(--korall);
+  opacity:.5; vertical-align:-2px; }}
+.radpil .pil {{ width:14px; height:14px; }}
+.omradesnamn {{ font-weight:600; }}
+tr.klickbar:hover .radpil {{ opacity:1; }}
+tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
+
+.klicktips {{ display:flex; align-items:center; gap:9px; margin:0 0 14px;
+  padding:11px 15px; background:var(--korall-ljus); border-radius:10px;
+  font-size:13.5px; font-weight:600; color:var(--korall-mork); }}
+.klicktips .pil {{ flex:none; width:16px; height:16px; }}
 
 .detaljkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:24px; box-shadow:var(--skugga); }}
@@ -1350,6 +1370,10 @@ const LOKAL = {lokal_json};
   const PART = LOKAL.partier;
   const FARG = LOKAL.farger;
   const KAMMARORDNING = {kammarordning_json};
+  /* Samma pilikon som Lysio använder i sina knappar. */
+  const PIL = '<svg class="pil" viewBox="0 0 16 16" aria-hidden="true">' +
+    '<path d="M1 8h12M9 4l4 4-4 4" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   /* Lokala partier saknar etablerad partifärg och får korallen ur profilen. */
   const LOKALFARG = '{KORALL}';
   const ETIKETT = {{ region: 'regioner', kommun: 'kommuner' }};
@@ -1687,7 +1711,8 @@ const LOKAL = {lokal_json};
         return '<td class="tal">' + (v === undefined ? '–' : v.toFixed(1)) + '</td>';
       }}).join('');
       return '<tr class="klickbar" data-kod="' + p.kod + '">' +
-        '<td class="inst">' + p.namn + '</td>' + stod +
+        '<td class="inst"><span class="omradesnamn">' + p.namn + '</span>' +
+        '<span class="radpil" aria-hidden="true">' + PIL + '</span></td>' + stod +
         '<td class="tal dim">' + p.mandat_totalt + '</td>' +
         '<td class="tal blockcell v">' + p.v + '</td>' +
         '<td class="tal blockcell h">' + p.h + '</td>' +
@@ -1695,6 +1720,15 @@ const LOKAL = {lokal_json};
         '<td><span class="styremarke ' + p.styre + '">' +
         STYRETEXT[p.styre] + '</span></td></tr>';
     }}).join('');
+
+    /* Uppmaningen ligger som eget element ovanför tabellen i stället för
+       nedsänkt i notisen, eftersom hover-effekten inte syns på touchskärmar. */
+    const tips = document.getElementById('klicktips');
+    if (tips) {{
+      const vad = niva === 'kommun' ? 'en kommun' : 'en region';
+      tips.innerHTML = PIL + '<span>Klicka på ' + vad + ' i tabellen för ' +
+        'mandatfördelning, jämförelse med förra valet och möjliga styren</span>';
+    }}
 
     const sam = LOKAL.sammanfattning[niva] || {{}};
     styrerad.innerHTML =
@@ -1707,11 +1741,10 @@ const LOKAL = {lokal_json};
       '<div class="styrekort"><div class="n">' + (sam.antal || 0) + '</div>' +
       '<div class="e">' + ETIKETT[niva] + ' totalt</div></div>';
 
-    let text = 'Klicka på ett område för mer detaljer. Prognosen bygger på ' +
-      'riksdagsprognosen, justerad med områdets egen profil och den historiska ' +
-      'skillnaden mellan ' + niva + 'val och riksdagsval. Lokala partier ' +
-      'redovisas samlat som ÖVRIGA och hålls på förra valets nivå, eftersom de ' +
-      'inte går att prognosticera var för sig.';
+    let text = 'Prognosen bygger på områdets eget resultat i förra ' + niva +
+      'valet, skalat med rikstrenden. Lokala partier redovisas samlat som ' +
+      'ÖVRIGA och hålls på förra valets nivå, eftersom de inte går att ' +
+      'prognosticera var för sig.';
     if (kapat) {{
       text = 'Visar de ' + TAK[niva] + ' första av ' + totalt + ' ' +
         ETIKETT[niva] + ' i bokstavsordning. Sök för att hitta ett område. ' + text;
