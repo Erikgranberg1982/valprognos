@@ -656,22 +656,29 @@ body {{ margin:0; background:var(--bg); color:var(--text);
 .toppinner {{ max-width:1140px; margin:0 auto; padding:16px 24px;
   display:flex; align-items:center; justify-content:space-between; gap:20px; }}
 .logo {{ display:inline-flex; align-items:center; text-decoration:none; }}
-/* Den breda färgvarianten och den kvadratiska vita har olika proportioner, så
-   de får olika höjd för att väga lika tungt optiskt. */
-.logo img {{ display:block; width:auto; }}
-.logo-ljus {{ height:46px; }}
-.logo-mork {{ height:54px; }}
 /* Färgvarianten är bred med bubblorna till vänster, den vita är kvadratisk med
    bubblorna ovanför ordmärket. Den vita används bara i mörkt läge. */
-.logo-mork {{ display:none; }}
+/* En variant åt gången. Båda logotyperna ligger alltid i sidan och CSS avgör
+   vilken som visas, så att växlingen sker utan omladdning.
+
+   Lösningen använder opacity i stället för display, eftersom bilderna då kan
+   staplas ovanpå varandra i samma ruta. Det gör att exakt en är synlig i alla
+   tre lägen: systemstandard, explicit ljust och explicit mörkt, utan att
+   regelordningen behöver stämma. */
+.logoruta {{ position:relative; display:inline-flex; align-items:center;
+  height:54px; }}
+.logoruta img {{ display:block; width:auto; transition:opacity .12s; }}
+.logo-ljus {{ height:46px; opacity:1; }}
+.logo-mork {{ height:54px; opacity:0; position:absolute; left:0;
+  top:50%; transform:translateY(-50%); pointer-events:none; }}
 @media (prefers-color-scheme: dark) {{
-  :root:not([data-theme="light"]) .logo-ljus {{ display:none; }}
-  :root:not([data-theme="light"]) .logo-mork {{ display:block; }}
+  :root:not([data-theme="light"]) .logo-ljus {{ opacity:0; }}
+  :root:not([data-theme="light"]) .logo-mork {{ opacity:1; }}
 }}
-:root[data-theme="dark"] .logo-ljus {{ display:none; }}
-:root[data-theme="dark"] .logo-mork {{ display:block; }}
-:root[data-theme="light"] .logo-ljus {{ display:block; }}
-:root[data-theme="light"] .logo-mork {{ display:none; }}
+:root[data-theme="dark"] .logo-ljus {{ opacity:0; }}
+:root[data-theme="dark"] .logo-mork {{ opacity:1; }}
+:root[data-theme="light"] .logo-ljus {{ opacity:1; }}
+:root[data-theme="light"] .logo-mork {{ opacity:0; }}
 .temaknapp {{ background:none; border:1px solid var(--linje); color:var(--svag);
   border-radius:28px; padding:7px 15px; font:inherit; font-size:13px; font-weight:500;
   cursor:pointer; }}
@@ -998,11 +1005,14 @@ footer strong {{ color:var(--text); }}
 </style></head><body>
 
 <div class="topp"><div class="toppinner">
-  <a class="logo" href="https://lysio.se" target="_blank" rel="noopener">
-    <img class="logo-ljus" src="{logo_farg}" alt="Lysio Research"
-         width="188" height="88">
-    <img class="logo-mork" src="{logo_vit}" alt="Lysio Research"
-         width="97" height="88">
+  <a class="logo" href="https://lysio.se" target="_blank" rel="noopener"
+     aria-label="Lysio Research">
+    <span class="logoruta">
+      <img class="logo-ljus" src="{logo_farg}" alt="Lysio Research"
+           width="188" height="88">
+      <img class="logo-mork" src="{logo_vit}" alt="" aria-hidden="true"
+           width="97" height="88">
+    </span>
   </a>
   <button class="temaknapp" id="tema">Mörkt läge</button>
 </div></div>
