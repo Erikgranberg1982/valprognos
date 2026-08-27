@@ -218,8 +218,14 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
                 "v": int(rad["mandat_vanster"]),
                 "h": int(rad["mandat_hoger"]),
                 "o": int(rad["mandat_ovriga"]),
-                "styre": ("vanster" if rad["vanster_majoritet"]
-                          else "hoger" if rad["hoger_majoritet"] else "vagmastare"),
+                "m_vanster": int(rad.get("mandat_vanster_ren", 0)),
+                "m_c": int(rad.get("mandat_c", 0)),
+                "m_borg": int(rad.get("mandat_borgerliga", 0)),
+                "m_sd": int(rad.get("mandat_sd_ensam", 0)),
+                "m_ovr": int(rad.get("mandat_utanfor", 0)),
+                "lage": str(rad.get("lage", "okant")),
+                "lagetext": str(rad.get("lage_text", "")),
+                "lagebesk": str(rad.get("lage_beskrivning", "")),
                 "stod": {p: tal(rad.get(f"stod_{p}")) for p in partier
                          if f"stod_{p}" in rad},
                 "mandat": {p: int(rad[f"mandat_{p}"]) for p in partier
@@ -265,10 +271,21 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     kommundata = paketera(kommuner, "kommun")
 
     def styresammanfattning(poster):
+        """Grupperar områdena efter mandatläge.
+
+        Tidigare räknades vänster- och högermajoritet enligt riksdagsvalets
+        blockindelning. Lokalt blev det missvisande, eftersom C där oftare
+        styr med de borgerliga än med vänstern.
+        """
+        raknare = {}
+        for p in poster:
+            raknare[p["lage"]] = raknare.get(p["lage"], 0) + 1
         return {
-            "vanster": sum(1 for p in poster if p["styre"] == "vanster"),
-            "hoger": sum(1 for p in poster if p["styre"] == "hoger"),
-            "vagmastare": sum(1 for p in poster if p["styre"] == "vagmastare"),
+            "egen_majoritet": raknare.get("vanster", 0),
+            "kravs_c": raknare.get("vanster_c", 0) + raknare.get("borgerlig_c", 0),
+            "hoger": (raknare.get("hoger_sd", 0) + raknare.get("hoger_flera", 0)),
+            "lokala": raknare.get("lokala_vagmastare", 0),
+            "oklart": raknare.get("oklart", 0),
             "antal": len(poster),
         }
 
@@ -308,8 +325,9 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     <div class="klicktips" id="klicktips"></div>
     <div class="tabellwrap"><table>
       <thead><tr><th>Område</th>{partihuvud}
-        <th class="tal">Mandat</th><th class="tal">V-block</th>
-        <th class="tal">H-block</th><th class="tal">Övr</th><th>Styre</th>
+        <th class="tal">Mandat</th><th class="tal">V+S+MP</th>
+        <th class="tal">C</th><th class="tal">M+KD+L</th>
+        <th class="tal">SD</th><th class="tal">Övr</th><th>Mandatläge</th>
         </tr></thead>
       <tbody id="lokalkropp"></tbody>
     </table></div>
@@ -430,10 +448,12 @@ def _metod_lokal() -> str:
     </div>
     <div class="metodruta">
       <div class="mrubrik">Koalitioner</div>
-      <p>Vänster mot höger är för grovt lokalt. Efter valet 2022 har 99 av 290
+      <p>Vänster mot höger är för grovt lokalt. Efter valet 2022 har 101 av 290
       kommuner ett blocköverskridande styre, och SCB räknar 84 olika
-      partikonstellationer. Därför visas de vanligaste koalitionerna per
-      område, med hur många kommuner eller regioner de faktiskt styr nu.</p>
+      konstellationer. C räknas därför inte till något block, och tabellen visar
+      mandatläge i stället för blockmajoritet: en tidigare version angav
+      vänstermajoritet i 57 procent av kommunerna, medan faktiskt vänsterstyre
+      var 20 procent.</p>
     </div>
     <div class="metodruta">
       <div class="mrubrik">Lokala partier</div>
@@ -775,6 +795,11 @@ tbody tr:hover {{ background:var(--panel); }}
 .alder {{ display:block; font-size:11px; color:var(--svag); }}
 .blockcell {{ font-weight:600; }}
 .blockcell.v {{ color:#EE2020; }} .blockcell.h {{ color:#0F8FCC; }}
+.blockcell.c {{ color:#0B7A2E; }} .blockcell.sd {{ color:#A89000; }}
+:root[data-theme="dark"] .blockcell.sd,
+:root:not([data-theme="light"]) .blockcell.sd {{ color:#DDDD00; }}
+:root[data-theme="dark"] .blockcell.c,
+:root:not([data-theme="light"]) .blockcell.c {{ color:#7ED694; }}
 .viktbricka {{ display:inline-block; background:var(--korall-ljus); color:var(--korall-mork);
   font-weight:700; font-size:12px; padding:3px 9px; border-radius:28px; }}
 .viktbricka.noll {{ background:var(--panel); color:var(--svag); }}
@@ -929,12 +954,22 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .kammare.liten {{ max-width:100%; }}
 .kammare.liten .majoritetslinje {{ stroke-width:.034; }}
 .blockhalva {{ display:flex; flex-direction:column; gap:12px; }}
+.blockpost .bpnamn {{ white-space:nowrap; }}
 .blockpost {{ background:var(--panel); border-radius:11px; padding:13px 16px; }}
 .bpnamn {{ font-size:11.5px; text-transform:uppercase; letter-spacing:1px;
   color:var(--svag); font-weight:700; }}
 .bpvarde {{ font-size:27px; font-weight:800; letter-spacing:-1px; line-height:1.2; }}
 .bpvarde.v {{ color:#EE2020; }} .bpvarde.h {{ color:#0F8FCC; }}
+.bpvarde.c {{ color:#0B7A2E; }} .bpvarde.sd {{ color:#A89000; }}
 .bpvarde.o {{ color:var(--svag); }}
+:root[data-theme="dark"] .bpvarde.sd,
+:root:not([data-theme="light"]) .bpvarde.sd {{ color:#DDDD00; }}
+:root[data-theme="dark"] .bpvarde.c,
+:root:not([data-theme="light"]) .bpvarde.c {{ color:#7ED694; }}
+.lagetext {{ margin:11px 0 0; font-size:13px; color:var(--svag);
+  line-height:1.55; }}
+.kammargrid .blockhalva {{ display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:10px; }}
 .diff {{ font-size:13px; font-weight:700; letter-spacing:0; }}
 .diff.upp {{ color:var(--gron); }}
 .diff.ned {{ color:var(--korall); }}
@@ -1035,15 +1070,29 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
   border-radius:12px; padding:14px 16px; }}
 .styrekort .n {{ font-size:27px; font-weight:800; letter-spacing:-1px; line-height:1.15; }}
 .styrekort .e {{ font-size:12px; color:var(--svag); font-weight:500; }}
-.styremarke {{ display:inline-block; font-size:11.5px; font-weight:700;
-  padding:3px 10px; border-radius:28px; white-space:nowrap; }}
-.styremarke.vanster {{ background:rgba(238,32,32,.13); color:#C81E1E; }}
-.styremarke.hoger {{ background:rgba(82,189,236,.18); color:#0F7FB5; }}
-.styremarke.vagmastare {{ background:var(--korall-ljus); color:var(--korall-mork); }}
-:root[data-theme="dark"] .styremarke.vanster,
-:root:not([data-theme="light"]) .styremarke.vanster {{ color:#FF8A8A; }}
-:root[data-theme="dark"] .styremarke.hoger,
-:root:not([data-theme="light"]) .styremarke.hoger {{ color:#7CCBF0; }}
+/* Mandatläget färgas efter vem som når majoritet, inte efter block. Lägen där
+   ingen har egen majoritet får en neutral färg, eftersom utfallet där avgörs av
+   förhandlingar snarare än av mandaten. */
+.lagemarke {{ display:inline-block; font-size:11.5px; font-weight:700;
+  padding:3px 10px; border-radius:28px; white-space:nowrap; cursor:help; }}
+.lagemarke.vanster {{ background:rgba(238,32,32,.13); color:#C81E1E; }}
+.lagemarke.vanster_c {{ background:rgba(0,153,51,.14); color:#0B7A2E; }}
+.lagemarke.borgerlig_c {{ background:rgba(0,153,51,.14); color:#0B7A2E; }}
+.lagemarke.hoger_sd {{ background:rgba(82,189,236,.18); color:#0F7FB5; }}
+.lagemarke.hoger_flera {{ background:rgba(82,189,236,.18); color:#0F7FB5; }}
+.lagemarke.lokala_vagmastare {{ background:var(--korall-ljus);
+  color:var(--korall-mork); }}
+.lagemarke.oklart {{ background:var(--panel); color:var(--svag); }}
+:root[data-theme="dark"] .lagemarke.vanster,
+:root:not([data-theme="light"]) .lagemarke.vanster {{ color:#FF8A8A; }}
+:root[data-theme="dark"] .lagemarke.hoger_sd,
+:root[data-theme="dark"] .lagemarke.hoger_flera,
+:root:not([data-theme="light"]) .lagemarke.hoger_sd,
+:root:not([data-theme="light"]) .lagemarke.hoger_flera {{ color:#7CCBF0; }}
+:root[data-theme="dark"] .lagemarke.vanster_c,
+:root[data-theme="dark"] .lagemarke.borgerlig_c,
+:root:not([data-theme="light"]) .lagemarke.vanster_c,
+:root:not([data-theme="light"]) .lagemarke.borgerlig_c {{ color:#7ED694; }}
 .grafyta {{ position:relative; }}
 #trend {{ cursor:crosshair; }}
 .tooltip {{ position:absolute; pointer-events:none; z-index:5;
@@ -1377,8 +1426,6 @@ const LOKAL = {lokal_json};
   /* Lokala partier saknar etablerad partifärg och får korallen ur profilen. */
   const LOKALFARG = '{KORALL}';
   const ETIKETT = {{ region: 'regioner', kommun: 'kommuner' }};
-  const STYRETEXT = {{ vanster: 'Vänstermajoritet', hoger: 'Högermajoritet',
-                      vagmastare: 'Vågmästarläge' }};
   const TAK = {{ region: 999, kommun: 40 }};
 
   let niva = 'riksdag';
@@ -1655,26 +1702,30 @@ const LOKAL = {lokal_json};
           '<div><div class="detaljnamn">' + post.namn + '</div>' +
           '<div class="detaljmeta">' + tot + ' mandat · ' + post.majoritet +
           ' för majoritet</div></div>' +
-          '<span class="styremarke ' + post.styre + '">' +
-          STYRETEXT[post.styre] + '</span>' +
+          '<span class="lagemarke ' + post.lage + '">' + post.lagetext +
+          '</span>' +
         '</div>' +
         '<div class="kammargrid">' +
           '<div class="kammarhalva">' + ritaKammare(post) + '</div>' +
           '<div class="blockhalva">' +
-            '<div class="blockpost"><div class="bpnamn">Vänsterblock</div>' +
-            '<div class="bpvarde v">' + post.v + ' ' +
-            diffMarke(post.diff_v, 'm') + '</div></div>' +
-            '<div class="blockpost"><div class="bpnamn">Högerblock</div>' +
-            '<div class="bpvarde h">' + post.h + ' ' +
-            diffMarke(post.diff_h, 'm') + '</div></div>' +
-            '<div class="blockpost"><div class="bpnamn">Utanför blocken</div>' +
-            '<div class="bpvarde o">' + post.o + ' ' +
-            diffMarke(post.diff_o, 'm') + '</div></div>' +
+            '<div class="blockpost"><div class="bpnamn">V+S+MP</div>' +
+            '<div class="bpvarde v">' + (post.m_vanster || 0) + '</div></div>' +
+            '<div class="blockpost"><div class="bpnamn">C</div>' +
+            '<div class="bpvarde c">' + (post.m_c || 0) + '</div></div>' +
+            '<div class="blockpost"><div class="bpnamn">M+KD+L</div>' +
+            '<div class="bpvarde h">' + (post.m_borg || 0) + '</div></div>' +
+            '<div class="blockpost"><div class="bpnamn">SD</div>' +
+            '<div class="bpvarde sd">' + (post.m_sd || 0) + '</div></div>' +
+            ((post.m_ovr || 0) > 0
+              ? '<div class="blockpost"><div class="bpnamn">Lokala partier</div>' +
+                '<div class="bpvarde o">' + post.m_ovr + '</div></div>'
+              : '') +
           '</div>' +
         '</div>' +
         '<div class="mandatband">' + band +
           '<div class="bandgrans" style="left:' + gransProcent + '%"></div>' +
         '</div>' +
+        (post.lagebesk ? '<p class="lagetext">' + post.lagebesk + '</p>' : '') +
         '<div class="dstaplar">' +
           '<div class="dstapelhuvud"><span>Parti</span><span></span>' +
           '<span>Stöd</span><span>Mot 2022</span><span>Mandat</span></div>' +
@@ -1714,11 +1765,13 @@ const LOKAL = {lokal_json};
         '<td class="inst"><span class="omradesnamn">' + p.namn + '</span>' +
         '<span class="radpil" aria-hidden="true">' + PIL + '</span></td>' + stod +
         '<td class="tal dim">' + p.mandat_totalt + '</td>' +
-        '<td class="tal blockcell v">' + p.v + '</td>' +
-        '<td class="tal blockcell h">' + p.h + '</td>' +
-        '<td class="tal dim">' + p.o + '</td>' +
-        '<td><span class="styremarke ' + p.styre + '">' +
-        STYRETEXT[p.styre] + '</span></td></tr>';
+        '<td class="tal blockcell v">' + (p.m_vanster || 0) + '</td>' +
+        '<td class="tal blockcell c">' + (p.m_c || 0) + '</td>' +
+        '<td class="tal blockcell h">' + (p.m_borg || 0) + '</td>' +
+        '<td class="tal blockcell sd">' + (p.m_sd || 0) + '</td>' +
+        '<td class="tal dim">' + (p.m_ovr || 0) + '</td>' +
+        '<td><span class="lagemarke ' + p.lage + '" title="' +
+        (p.lagebesk || '') + '">' + p.lagetext + '</span></td></tr>';
     }}).join('');
 
     /* Uppmaningen ligger som eget element ovanför tabellen i stället för
@@ -1732,19 +1785,23 @@ const LOKAL = {lokal_json};
 
     const sam = LOKAL.sammanfattning[niva] || {{}};
     styrerad.innerHTML =
-      '<div class="styrekort"><div class="n">' + (sam.vanster || 0) + '</div>' +
-      '<div class="e">med vänstermajoritet</div></div>' +
+      '<div class="styrekort"><div class="n">' + (sam.egen_majoritet || 0) + '</div>' +
+      '<div class="e">där V+S+MP når majoritet själva</div></div>' +
+      '<div class="styrekort"><div class="n">' + (sam.kravs_c || 0) + '</div>' +
+      '<div class="e">där C avgör vem som kan styra</div></div>' +
       '<div class="styrekort"><div class="n">' + (sam.hoger || 0) + '</div>' +
-      '<div class="e">med högermajoritet</div></div>' +
-      '<div class="styrekort"><div class="n">' + (sam.vagmastare || 0) + '</div>' +
-      '<div class="e">i vågmästarläge</div></div>' +
-      '<div class="styrekort"><div class="n">' + (sam.antal || 0) + '</div>' +
-      '<div class="e">' + ETIKETT[niva] + ' totalt</div></div>';
+      '<div class="e">där borgerliga når majoritet</div></div>' +
+      '<div class="styrekort"><div class="n">' +
+      ((sam.lokala || 0) + (sam.oklart || 0)) + '</div>' +
+      '<div class="e">utan tydlig majoritet</div></div>';
 
-    let text = 'Prognosen bygger på områdets eget resultat i förra ' + niva +
-      'valet, skalat med rikstrenden. Lokala partier redovisas samlat som ' +
-      'ÖVRIGA och hålls på förra valets nivå, eftersom de inte går att ' +
-      'prognosticera var för sig.';
+    let text = 'Mandatläget säger vem som kan nå majoritet, inte vem som ' +
+      'kommer att styra. Det avgörs av förhandlingar. C räknas inte till något ' +
+      'block: efter valet 2022 ingick partiet i 135 kommunstyren, varav 55 med ' +
+      'de borgerliga, 48 med båda sidorna och 32 med vänstern. Prognosen bygger ' +
+      'på områdets eget resultat i förra ' + niva + 'valet, skalat med ' +
+      'rikstrenden. Lokala partier redovisas samlat som ÖVRIGA och hålls på ' +
+      'förra valets nivå.';
     if (kapat) {{
       text = 'Visar de ' + TAK[niva] + ' första av ' + totalt + ' ' +
         ETIKETT[niva] + ' i bokstavsordning. Sök för att hitta ett område. ' + text;

@@ -349,6 +349,7 @@ def sammanfatta(prognos: pd.DataFrame) -> pd.DataFrame:
         if lokalt and np.isfinite(rad.get("lokalt_stod", np.nan)):
             stod[str(lokalt)] = float(rad["lokalt_stod"])
         mandat = fordela_regionmandat(stod, platser)
+        stod_mandat = {k: int(v) for k, v in mandat.items()}
 
         post = {"omrade": omrade, "namn": rad["namn"], "mandat_totalt": platser}
         post.update({f"stod_{p}": stod[p] for p in partikolumner})
@@ -373,6 +374,19 @@ def sammanfatta(prognos: pd.DataFrame) -> pd.DataFrame:
         post["vanster_majoritet"] = vanster >= post["majoritet"]
         post["hoger_majoritet"] = hoger >= post["majoritet"]
         post["vagmastare"] = not (post["vanster_majoritet"] or post["hoger_majoritet"])
+
+        # Mandatläget beskrivs utan att gissa vilket styre som bildas, eftersom
+        # C lokalt oftare styr med de borgerliga än med vänstern.
+        lage_mandat = dict(stod_mandat)
+        lage = lokala_koalitioner.beskriv_lage(lage_mandat, platser)
+        post["lage"] = lage["lage"]
+        post["lage_text"] = lage["text"]
+        post["lage_beskrivning"] = lage["beskrivning"]
+        post["mandat_vanster_ren"] = lage["vanster"]
+        post["mandat_borgerliga"] = lage["borgerliga"]
+        post["mandat_c"] = lage["c"]
+        post["mandat_sd_ensam"] = lage["sd"]
+        post["mandat_utanfor"] = lage["ovriga"]
 
         # Vilka av de vanligaste lokala koalitionerna når majoritet här. Vänster
         # mot höger är för grovt lokalt: blocköverskridande styren är det

@@ -264,6 +264,33 @@ sannolikheten.
 Lägg till egna koalitioner genom att fylla på CSV-filen. Partierna anges som
 `M+KD+L+C`.
 
+### Mandatläge i stället för blockmajoritet
+
+Tabellen visade tidigare vänster- eller högermajoritet enligt riksdagsvalets
+blockindelning, där C räknas till vänsterblocket. Lokalt blev det missvisande:
+modellen angav vänstermajoritet i 57 procent av kommunerna, medan faktiskt
+vänsterstyre efter valet 2022 var 20 procent.
+
+Orsaken är att C lokalt oftare styr med de borgerliga. Av de 135 kommunstyren
+partiet ingick i efter valet 2022 var 55 med de borgerliga, 48 med båda sidorna
+och 32 med vänstern.
+
+C räknas därför inte till något block. I stället beskrivs vad som faktiskt går
+att läsa ur mandaten:
+
+| Läge | Betyder |
+|---|---|
+| V+S+MP i majoritet | Vänsterpartierna når majoritet utan C |
+| Vänstern med C | V, S och MP behöver C |
+| Borgerliga med C | M, KD och L behöver C |
+| Borgerliga med SD | M, KD och L når majoritet med SD |
+| Högern har flera vägar | Borgerliga kan välja mellan C och SD |
+| Lokala partier avgör | Ingen sida når majoritet utan lokala partier |
+| Oklart läge | Ingen vanlig kombination räcker |
+
+Mandatläget säger vem som **kan** nå majoritet, inte vem som kommer att styra.
+Det avgörs av förhandlingar som ingen modell kan förutse.
+
 ## Justera modellen
 
 Alla parametrar ligger i CSV-filer och kan ändras utan kodändring:
