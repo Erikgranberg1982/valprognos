@@ -302,10 +302,12 @@ def _metod_lokal() -> str:
     Läggs in i sidan och visas i den lokala vyn, eftersom beräkningen skiljer
     sig väsentligt från riksdagsprognosen och osäkerheten är större.
     """
+    import kommunmodell
     import lokala_partier
     import regionmodell
 
     psu_procent = regionmodell.PSU_VIKT * 100
+    psu_kommun = kommunmodell.PSU_VIKT_KOMMUN * 100
     kvot_riksdag = lokala_partier.NIVAKVOT["riksdagsvalkrets"]
     kvot_region = lokala_partier.NIVAKVOT["region"]
 
@@ -332,10 +334,13 @@ def _metod_lokal() -> str:
       <div class="stegtext">
         <strong>Områdets profil</strong>
         <p>En multiplikator per parti som anger hur mycket starkare eller
-        svagare partiet är i området än i riket. Bygger på områdets eget
-        riksdagsvalsresultat 2022, vägt med {psu_procent:.0f} procent från
-        SCB:s partisympatiundersökning per landsdel så att profilen följer hur
-        opinionen rört sig sedan dess.</p>
+        svagare partiet är i området än i riket, byggd på områdets eget
+        riksdagsvalsresultat 2022.</p>
+        <p>För <strong>regionvalet</strong> vägs {psu_procent:.0f} procent in
+        från SCB:s partisympatiundersökning per landsdel, så att profilen följer
+        hur opinionen rört sig sedan dess. För <strong>kommunvalet</strong>
+        används den inte: landsdelarna är för grova för en enskild kommun, och
+        ett backtest visar att den försämrar prognosen där.</p>
       </div>
     </div>
     <div class="steg">
@@ -373,11 +378,18 @@ def _metod_lokal() -> str:
   <div class="metodrutor">
     <div class="metodruta">
       <div class="mrubrik">Träffsäkerhet</div>
-      <p>Ett test där bara 2018 års skillnad används för att förutsäga
-      regionvalet 2022 ger ett medelabsolutfel på <strong>1,5
-      procentenheter</strong>. Riksdagsprognosen ligger på 0,6 nära valdagen.
-      Skillnaden är väntad när underlaget är historik i stället för
-      mätningar.</p>
+      <p>Ett test där bara 2018 års skillnad används för att förutsäga valet
+      2022 ger ett medelabsolutfel på <strong>1,5 procentenheter</strong> för
+      regionvalet och <strong>2,4</strong> för kommunvalet. Riksdagsprognosen
+      ligger på 0,6 nära valdagen. Kommunerna är svårast: de är minst, och
+      lokala förhållanden väger tyngst där.</p>
+    </div>
+    <div class="metodruta">
+      <div class="mrubrik">Varför inte SCB på kommunnivå</div>
+      <p>Partisympatiundersökningen delar landet i tio landsdelar. Västsverige
+      rymmer både Göteborg och Öckerö, som röstar helt olika, så signalen blir
+      missvisande för en enskild kommun. Med vikten 0,25 steg felet från 2,40
+      till 2,50 procentenheter, värst för SD, V och KD.</p>
     </div>
     <div class="metodruta">
       <div class="mrubrik">Spärrar och mandat</div>

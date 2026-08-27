@@ -10,3 +10,4 @@ trend_drift_sd_per_manad,0.0130,Extra osäkerhet per kvadratrot-månad kvar till
 antal_simuleringar,40000,Antal Monte Carlo-dragningar.
 anvand_valdagskorrigering,0,Sätt till 1 för att aktivera den historiska valdagskorrigeringen i data/valdagskorrigering.csv. Avstängd som standard eftersom den bygger på ett enda val och riskerar att befästa 2022-cykelns särdrag.
 psu_vikt,0.25,Hur mycket SCB:s regionala partisympati väger mot den historiska profilen i region- och kommunprognosen. Kalibrerat mot regionvalet 2022 där 0.25 gav lägsta felet. Ren PSU är sämre eftersom landsdelarna är för grova.
+psu_vikt_kommun,0.0,Vikt för SCB:s regionala partisympati i kommunprognosen. Avstängd eftersom landsdelarna är för grova för en enskild kommun. Ett backtest mot kommunvalet 2022 visar att vikten 0.25 försämrar felet från 2.40 till 2.50 procentenheter.

@@ -33,6 +33,17 @@ STANDARD_FULLMAKTIGE = 41
 # eftersom kommunfullmäktige är mindre och mandatkvoten därmed lägre.
 OVRIGA_EFFEKTIV_SPARR = 3.5
 
+# SCB:s partisympatiundersökning används inte på kommunnivå. Undersökningen är
+# indelad i tio landsdelar, vilket är för grovt för en enskild kommun:
+# Västsverige rymmer både Göteborg och Öckerö, som röstar helt olika. Ett
+# backtest mot kommunvalet 2022 visar att den försämrar prognosen, från 2,40
+# till 2,50 procentenheters medelabsolutfel med vikten 0,25. Värst blir det för
+# partier som varierar kraftigt inom en landsdel: SD, V och KD.
+#
+# Regionmodellen använder den däremot, se regionmodell.PSU_VIKT, eftersom en
+# region ligger närmare en landsdel i storlek.
+PSU_VIKT_KOMMUN = float(cfg._P.get("psu_vikt_kommun", 0.0))
+
 
 def _lansdel_for_kommun(kommunkod: str) -> str | None:
     """Kommunkodens två första siffror är länskoden.
@@ -58,10 +69,9 @@ def _lansdel_for_kommun(kommunkod: str) -> str | None:
 def _blanda_in_psu(profil: pd.DataFrame) -> pd.DataFrame:
     """Väger in SCB:s partisympati per landsdel i kommunens profil.
 
-    Samma vikt används som i regionmodellen, där den är kalibrerad mot
-    regionvalet 2022. Signalen är grov på kommunnivå, eftersom en landsdel
-    rymmer många kommuner, men den fångar ändå att opinionen rört sig olika i
-    olika delar av landet sedan förra valet.
+    Avstängd som standard, se PSU_VIKT_KOMMUN. Funktionen finns kvar för den
+    som vill experimentera med en låg vikt via psu_vikt_kommun i
+    data/modellparametrar.csv.
     """
     try:
         psu = scb_data.hamta_psu_landsdel().reset_index()
@@ -77,7 +87,7 @@ def _blanda_in_psu(profil: pd.DataFrame) -> pd.DataFrame:
         return profil
     psu_profil = aktuell.drop(index="Z01").div(aktuell.loc["Z01"], axis=1)
 
-    vikt = regionmodell.PSU_VIKT
+    vikt = PSU_VIKT_KOMMUN
     ut = profil.copy()
     landsdelar = {k: _lansdel_for_kommun(str(k)) for k in ut.index}
 
@@ -142,7 +152,8 @@ def prognos_per_kommun(riksprognos: pd.Series,
 
     riket = riksdagsval.mean()
     profil = riksdagsval.div(riket, axis=1)
-    profil = _blanda_in_psu(profil)
+    if PSU_VIKT_KOMMUN > 0:
+        profil = _blanda_in_psu(profil)
 
     namn = scb_data.kommunnamn()
     urval = kommuner or [k for k in differenser.index if k in profil.index]
