@@ -308,6 +308,9 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     }
 
     partihuvud = "".join(f'<th class="tal">{p}</th>' for p in partier)
+    partihuvud_sort = "".join(
+        f'<th class="tal"><button class="sortknapp" data-sort="stod:{p}">{p}</button></th>'
+        for p in partier)
     metod_html = _metod_lokal()
 
     html = f"""
@@ -323,12 +326,18 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
   <div id="lokaloversikt">
     <div class="styrerad" id="styrerad"></div>
     <div class="klicktips" id="klicktips"></div>
-    <div class="tabellwrap"><table>
-      <thead><tr><th>Område</th>{partihuvud}
-        <th class="tal">Mandat</th><th class="tal">V+S+MP</th>
-        <th class="tal">C</th><th class="tal">M+KD+L</th>
-        <th class="tal">SD</th><th class="tal">Övr</th><th>Mandatläge</th>
-        </tr></thead>
+    <div class="tabellwrap"><table class="sorterbar">
+      <thead><tr>
+        <th><button class="sortknapp" data-sort="namn">Område</button></th>
+        {partihuvud_sort}
+        <th class="tal"><button class="sortknapp" data-sort="mandat_totalt">Mandat</button></th>
+        <th class="tal"><button class="sortknapp" data-sort="m_vanster">V+S+MP</button></th>
+        <th class="tal"><button class="sortknapp" data-sort="m_c">C</button></th>
+        <th class="tal"><button class="sortknapp" data-sort="m_borg">M+KD+L</button></th>
+        <th class="tal"><button class="sortknapp" data-sort="m_sd">SD</button></th>
+        <th class="tal"><button class="sortknapp" data-sort="m_ovr">Övr</button></th>
+        <th><button class="sortknapp" data-sort="lagetext">Mandatläge</button></th>
+      </tr></thead>
       <tbody id="lokalkropp"></tbody>
     </table></div>
     <div class="notis" id="lokalnotis"></div>
@@ -920,6 +929,25 @@ tr.klickbar:focus-visible {{ outline:2px solid var(--korall); outline-offset:-2p
 tr.klickbar:hover .radpil {{ opacity:1; }}
 tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 
+/* Sorterbara rubriker. Knappen ärver rubrikens utseende så att tabellen ser
+   oförändrad ut, med en pil som visar aktiv kolumn och riktning. */
+.sorterbar th {{ padding:0; }}
+.sortknapp {{ width:100%; background:none; border:none; font:inherit;
+  color:inherit; letter-spacing:inherit; text-transform:inherit;
+  cursor:pointer; padding:13px 12px; text-align:left; position:relative;
+  display:block; }}
+.tal .sortknapp {{ text-align:right; padding-right:19px; }}
+.sortknapp:hover {{ color:var(--korall); }}
+.sortknapp::after {{ content:'↕'; position:absolute; right:5px;
+  opacity:0; font-size:10px; font-weight:400; }}
+.tal .sortknapp::after {{ right:5px; }}
+.sortknapp:hover::after {{ opacity:.45; }}
+.sortknapp.sorterad {{ color:var(--korall); }}
+.sortknapp.sorterad::after {{ content:'↑'; opacity:1; font-size:11px;
+  font-weight:700; }}
+.sortknapp.sorterad.fallande::after {{ content:'↓'; }}
+.sortknapp:focus-visible {{ outline:2px solid var(--korall); outline-offset:-2px; }}
+
 .klicktips {{ display:flex; align-items:center; gap:9px; margin:0 0 14px;
   padding:11px 15px; background:var(--korall-ljus); border-radius:10px;
   font-size:13.5px; font-weight:600; color:var(--korall-mork); }}
@@ -1430,6 +1458,10 @@ const LOKAL = {lokal_json};
 
   let niva = 'riksdag';
   let valtOmrade = null;
+  /* Sorteringen. Områdesnamn sorteras stigande, tal fallande, eftersom man
+     nästan alltid vill se var ett parti är starkast först. */
+  let sortNyckel = 'namn';
+  let sortFallande = false;
   let kommunerLaddade = false;
   let laddning = null;
 
@@ -1739,6 +1771,45 @@ const LOKAL = {lokal_json};
     rensa.hidden = false;
   }}
 
+  /* Plockar ut värdet som ska sorteras på. Nyckeln "stod:KD" betyder partiets
+     stöd, övriga nycklar är fält direkt på posten. */
+  function sortVarde(post, nyckel) {{
+    if (nyckel.indexOf('stod:') === 0) {{
+      const parti = nyckel.slice(5);
+      const v = post.stod ? post.stod[parti] : null;
+      return (typeof v === 'number') ? v : -1;
+    }}
+    const v = post[nyckel];
+    if (typeof v === 'number') return v;
+    return v === undefined || v === null ? '' : String(v);
+  }}
+
+  function sortera(poster) {{
+    const nyckel = sortNyckel;
+    return poster.sort(function(a, b) {{
+      const va = sortVarde(a, nyckel), vb = sortVarde(b, nyckel);
+      let jmf;
+      if (typeof va === 'number' && typeof vb === 'number') {{
+        jmf = va - vb;
+      }} else {{
+        jmf = String(va).localeCompare(String(vb), 'sv');
+      }}
+      /* Lika värden sorteras på namn, så ordningen blir stabil och läsbar. */
+      if (jmf === 0) return a.namn.localeCompare(b.namn, 'sv');
+      return sortFallande ? -jmf : jmf;
+    }});
+  }}
+
+  function uppdateraSortMarken() {{
+    document.querySelectorAll('.sortknapp').forEach(function(k) {{
+      const aktiv = k.dataset.sort === sortNyckel;
+      k.classList.toggle('sorterad', aktiv);
+      k.classList.toggle('fallande', aktiv && sortFallande);
+      k.setAttribute('aria-sort', aktiv
+        ? (sortFallande ? 'descending' : 'ascending') : 'none');
+    }});
+  }}
+
   function ritaOversikt() {{
     detalj.hidden = true;
     oversikt.hidden = false;
@@ -1750,7 +1821,9 @@ const LOKAL = {lokal_json};
     const fraga = normalisera(sok.value.trim());
     let poster = fraga
       ? alla.filter(function(p) {{ return normalisera(p.namn).includes(fraga); }})
-      : alla;
+      : alla.slice();
+
+    poster = sortera(poster);
 
     const totalt = poster.length;
     const kapat = !fraga && totalt > TAK[niva];
@@ -1779,8 +1852,10 @@ const LOKAL = {lokal_json};
     const tips = document.getElementById('klicktips');
     if (tips) {{
       const vad = niva === 'kommun' ? 'en kommun' : 'en region';
-      tips.innerHTML = PIL + '<span>Klicka på ' + vad + ' i tabellen för ' +
-        'mandatfördelning, jämförelse med förra valet och möjliga styren</span>';
+      tips.innerHTML = PIL + '<span>Klicka på ' + vad + ' för mandatfördelning, ' +
+        'jämförelse med förra valet och möjliga styren. Klicka på en ' +
+        'kolumnrubrik för att sortera, till exempel för att se var ett parti är ' +
+        'starkast.</span>';
     }}
 
     const sam = LOKAL.sammanfattning[niva] || {{}};
@@ -1810,6 +1885,7 @@ const LOKAL = {lokal_json};
         sok.value + '". ' + text;
     }}
     notis.textContent = text;
+    uppdateraSortMarken();
   }}
 
   function rita() {{
@@ -1856,6 +1932,22 @@ const LOKAL = {lokal_json};
 
   knappar.forEach(function(k) {{
     k.addEventListener('click', function() {{ visaNiva(k.dataset.niva); }});
+  }});
+
+  /* Rubrikerna sorterar. Ett andra klick på samma kolumn vänder ordningen. */
+  document.querySelectorAll('.sortknapp').forEach(function(knapp) {{
+    knapp.addEventListener('click', function() {{
+      const nyckel = knapp.dataset.sort;
+      if (nyckel === sortNyckel) {{
+        sortFallande = !sortFallande;
+      }} else {{
+        sortNyckel = nyckel;
+        /* Tal börjar fallande, text stigande. */
+        sortFallande = nyckel !== 'namn' && nyckel !== 'lagetext';
+      }}
+      valtOmrade = null;
+      ritaOversikt();
+    }});
   }});
 
   kropp.addEventListener('click', function(e) {{

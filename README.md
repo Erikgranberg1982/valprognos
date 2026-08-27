@@ -264,6 +264,16 @@ sannolikheten.
 Lägg till egna koalitioner genom att fylla på CSV-filen. Partierna anges som
 `M+KD+L+C`.
 
+### Sortering
+
+Alla kolumner i region- och kommuntabellen går att sortera genom att klicka på
+rubriken. Ett andra klick vänder ordningen. Tal börjar fallande och text
+stigande, eftersom man nästan alltid vill se var ett parti är starkast först.
+
+Det är användbart för att hitta mönster i 290 kommuner. Sorterat på KD hamnar
+Markaryd först med 42 procent, följt av Sävsjö och Lycksele. Sorteringen
+fungerar tillsammans med sökfältet.
+
 ### Mandatläge i stället för blockmajoritet
 
 Tabellen visade tidigare vänster- eller högermajoritet enligt riksdagsvalets
