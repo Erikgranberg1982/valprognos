@@ -294,6 +294,7 @@ version hämtade kommundata med `fetch`, vilket gjorde kommunvyn tom vid lokal
 ## Filer
 
 ```
+assets/             Lysios logotyper, hämtade från lysio.se. Se assets/KALLA.md
 src/config.py       Partier, block, regeringsalternativ, parameterinläsning
 src/scraper.py      Hämtning och normalisering av mätningar
 src/modell.py       Viktning, husfaktorer, mandatfördelning, simulering

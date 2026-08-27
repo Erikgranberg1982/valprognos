@@ -36,6 +36,20 @@ def _stapel(procent: float, farg: str, maxvarde: float = 35.0) -> str:
     return f'<div class="stapel" style="width:{bredd:.1f}%;background:{farg}"></div>'
 
 
+def _logotyp(filnamn: str) -> str:
+    """Läser en logotyp från assets/ och returnerar den som data-URI.
+
+    Logotyperna bäddas in i sidan i stället för att hämtas från lysio.se, så att
+    den publicerade sidan inte beror på att filerna ligger kvar där. De är
+    palett-PNG på några kilobyte styck.
+    """
+    fil = ROT / "assets" / filnamn
+    if not fil.exists():
+        return ""
+    kodad = base64.b64encode(fil.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{kodad}"
+
+
 def _diff(varde, decimaler: int = 1) -> str:
     """Formaterar en förändring mot förra valet med tecken och färg."""
     if varde is None:
@@ -584,6 +598,8 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
     partier_json = json.dumps(cfg.PARTIER)
     partifarg_json = json.dumps(cfg.PARTIFARG)
     lokal_html, lokal_json, kommun_json = _lokal_sektion(regioner, kommuner)
+    logo_farg = _logotyp("lysio-logo-farg.png")
+    logo_vit = _logotyp("lysio-logo-vit.png")
     partier_lokal_json = json.dumps(list(cfg.PARTIER) + ["ÖVRIGA"])
     kammarordning_json = json.dumps(KAMMARORDNING)
     block_v_json = json.dumps(cfg.BLOCK["vanster"])
@@ -637,19 +653,25 @@ body {{ margin:0; background:var(--bg); color:var(--text);
 
 /* --- Sidhuvud --- */
 .topp {{ background:var(--sand); border-bottom:1px solid var(--linje); margin-bottom:0; }}
-.toppinner {{ max-width:1140px; margin:0 auto; padding:20px 24px;
+.toppinner {{ max-width:1140px; margin:0 auto; padding:16px 24px;
   display:flex; align-items:center; justify-content:space-between; gap:20px; }}
-.logo {{ display:flex; align-items:center; gap:11px; }}
-.logomark {{ position:relative; width:34px; height:34px; flex:none; }}
-.bubbla {{ position:absolute; border-radius:50%; background:var(--korall); }}
-.b1 {{ width:17px; height:17px; right:0; top:3px; }}
-.b2 {{ width:10px; height:10px; left:3px; top:0; }}
-.b3 {{ width:7px; height:7px; left:0; bottom:8px; }}
-.b4 {{ width:13px; height:13px; left:8px; bottom:0; }}
-.logotext {{ font-weight:800; font-size:19px; letter-spacing:-.4px; color:var(--korall);
-  line-height:1; }}
-.logotext small {{ display:block; font-size:9px; font-weight:600; letter-spacing:2.4px;
-  color:var(--svag); margin-top:2px; }}
+.logo {{ display:inline-flex; align-items:center; text-decoration:none; }}
+/* Den breda färgvarianten och den kvadratiska vita har olika proportioner, så
+   de får olika höjd för att väga lika tungt optiskt. */
+.logo img {{ display:block; width:auto; }}
+.logo-ljus {{ height:46px; }}
+.logo-mork {{ height:54px; }}
+/* Färgvarianten är bred med bubblorna till vänster, den vita är kvadratisk med
+   bubblorna ovanför ordmärket. Den vita används bara i mörkt läge. */
+.logo-mork {{ display:none; }}
+@media (prefers-color-scheme: dark) {{
+  :root:not([data-theme="light"]) .logo-ljus {{ display:none; }}
+  :root:not([data-theme="light"]) .logo-mork {{ display:block; }}
+}}
+:root[data-theme="dark"] .logo-ljus {{ display:none; }}
+:root[data-theme="dark"] .logo-mork {{ display:block; }}
+:root[data-theme="light"] .logo-ljus {{ display:block; }}
+:root[data-theme="light"] .logo-mork {{ display:none; }}
 .temaknapp {{ background:none; border:1px solid var(--linje); color:var(--svag);
   border-radius:28px; padding:7px 15px; font:inherit; font-size:13px; font-weight:500;
   cursor:pointer; }}
@@ -976,13 +998,12 @@ footer strong {{ color:var(--text); }}
 </style></head><body>
 
 <div class="topp"><div class="toppinner">
-  <div class="logo">
-    <div class="logomark">
-      <span class="bubbla b1"></span><span class="bubbla b2"></span>
-      <span class="bubbla b3"></span><span class="bubbla b4"></span>
-    </div>
-    <div class="logotext">Lysio<small>RESEARCH</small></div>
-  </div>
+  <a class="logo" href="https://lysio.se" target="_blank" rel="noopener">
+    <img class="logo-ljus" src="{logo_farg}" alt="Lysio Research"
+         width="188" height="88">
+    <img class="logo-mork" src="{logo_vit}" alt="Lysio Research"
+         width="97" height="88">
+  </a>
   <button class="temaknapp" id="tema">Mörkt läge</button>
 </div></div>
 
