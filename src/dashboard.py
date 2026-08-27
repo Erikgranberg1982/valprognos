@@ -205,7 +205,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
             return None
         return round(flyt, decimaler)
 
-    def paketera(df):
+    def paketera(df, niva):
         if df is None or df.empty:
             return []
         ut = []
@@ -237,6 +237,14 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
                 "diff_o": (int(rad["diff_ovriga"])
                            if rad.get("diff_ovriga") is not None else None),
             }
+            # Bara mandattalen per område. Namn, partier och antal styren är
+            # lika för alla områden och ligger i data.koalitioner, vilket
+            # sparar omkring 140 kB i kommundatan.
+            koal = [int(rad[f"koal_{k['id']}"]) for k in koalitioner_def
+                    if f"koal_{k['id']}" in rad]
+            if koal:
+                post["koal"] = koal
+
             # Namngivet lokalt parti, där en mätning finns.
             if rad.get("lokalt_parti"):
                 post["lokal"] = {
@@ -250,8 +258,11 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
             ut.append(post)
         return sorted(ut, key=lambda x: x["namn"])
 
-    regiondata = paketera(regioner)
-    kommundata = paketera(kommuner)
+    import lokala_koalitioner
+    koalitioner_def = lokala_koalitioner.las()
+
+    regiondata = paketera(regioner, "region")
+    kommundata = paketera(kommuner, "kommun")
 
     def styresammanfattning(poster):
         return {
@@ -271,6 +282,12 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         },
         "partier": partier,
         "farger": {p: cfg.PARTIFARG.get(p, "#9AA6B5") for p in partier},
+        "koalitioner": [{
+            "namn": k["namn"],
+            "partier": "+".join(k["partier"]),
+            "kommun": k["kommuner_2022"],
+            "region": k["regioner_2022"],
+        } for k in koalitioner_def],
     }
 
     partihuvud = "".join(f'<th class="tal">{p}</th>' for p in partier)
@@ -408,6 +425,13 @@ def _metod_lokal() -> str:
       Fullmäktiges storlek läses ur SCB:s valresultat, eftersom varje kommun
       och region beslutar sin egen: kommunerna varierar mellan 21 och 101
       ledamöter.</p>
+    </div>
+    <div class="metodruta">
+      <div class="mrubrik">Koalitioner</div>
+      <p>Vänster mot höger är för grovt lokalt. Efter valet 2022 har 99 av 290
+      kommuner ett blocköverskridande styre, och SCB räknar 84 olika
+      partikonstellationer. Därför visas de vanligaste koalitionerna per
+      område, med hur många kommuner eller regioner de faktiskt styr nu.</p>
     </div>
     <div class="metodruta">
       <div class="mrubrik">Lokala partier</div>
@@ -926,6 +950,40 @@ tr.klickbar:hover .inst {{ color:var(--korall); }}
 .mrubrik {{ font-size:11.5px; text-transform:uppercase; letter-spacing:1px;
   font-weight:700; color:var(--korall); margin-bottom:6px; }}
 .metodruta p {{ margin:0; font-size:13px; color:var(--svag); line-height:1.6; }}
+.koalblock {{ margin-top:22px; padding-top:20px;
+  border-top:1px solid var(--linje); }}
+.koalrubrik {{ font-size:12px; text-transform:uppercase; letter-spacing:1.3px;
+  font-weight:700; color:var(--svag); margin-bottom:12px; }}
+.koalhuvud, .koalrad {{ display:grid;
+  grid-template-columns:168px 1fr 46px 88px 62px; gap:11px; align-items:center; }}
+.koalhuvud {{ font-size:10.5px; text-transform:uppercase; letter-spacing:.9px;
+  color:var(--svag); font-weight:700; padding-bottom:6px; }}
+.koalhuvud span:nth-child(3) {{ text-align:right; }}
+.koalhuvud span:nth-child(5) {{ text-align:right; }}
+.koalrad {{ padding:7px 0; border-top:1px solid var(--linje); }}
+.koalrad.vinner .knamn {{ font-weight:700; }}
+.knamn {{ font-size:13.5px; line-height:1.3; }}
+.kpartier {{ display:block; font-size:11.5px; color:var(--svag); font-weight:500; }}
+.kbar {{ position:relative; height:16px; background:var(--panel);
+  border-radius:4px; overflow:hidden; }}
+.kfyll {{ height:100%; background:var(--svag); opacity:.45; border-radius:4px; }}
+.koalrad.vinner .kfyll {{ background:var(--gron); opacity:1; }}
+.kgrans {{ position:absolute; top:-2px; bottom:-2px; width:2px;
+  background:var(--text); opacity:.6; }}
+.kmandat {{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums;
+  font-size:13.5px; }}
+.kmarke {{ display:inline-block; font-size:11px; font-weight:700;
+  padding:2px 9px; border-radius:28px; white-space:nowrap; }}
+.kmarke.ja {{ background:rgba(125,186,116,.2); color:var(--gron); }}
+.kmarke.nej {{ background:var(--panel); color:var(--svag);
+  font-variant-numeric:tabular-nums; }}
+.kstyr {{ text-align:right; font-size:13px; color:var(--svag);
+  font-variant-numeric:tabular-nums; }}
+.koalnot {{ font-size:12px; color:var(--svag); margin:12px 0 0; line-height:1.6; }}
+@media (max-width:640px) {{
+  .koalhuvud, .koalrad {{ grid-template-columns:120px 1fr 38px 34px 40px; gap:7px; }}
+  .kmarke.ja {{ padding:2px 5px; font-size:10px; }}
+}}
 .lokalnotis {{ margin-top:18px; background:var(--korall-ljus);
   border-left:3px solid var(--korall); border-radius:0 8px 8px 0;
   padding:13px 16px; font-size:13px; color:var(--text); }}
@@ -1521,6 +1579,52 @@ const LOKAL = {lokal_json};
         '</div>';
     }}
 
+    /* Koalitionerna visar vilka konstellationer som når majoritet. Vänster mot
+       höger räcker inte lokalt: blocköverskridande styren är vanligast. */
+    let koalhtml = '';
+    if (post.koal && post.koal.length && LOKAL.koalitioner) {{
+      /* Mandattalen ligger per område, definitionerna i LOKAL.koalitioner. */
+      const sorterade = post.koal.map(function(mandat, i) {{
+        const def = LOKAL.koalitioner[i] || {{}};
+        return {{
+          namn: def.namn || '', partier: def.partier || '',
+          mandat: mandat, majoritet: mandat >= post.majoritet,
+          styr2022: niva === 'kommun' ? def.kommun : def.region,
+        }};
+      }}).sort(function(a, b) {{
+        return (b.majoritet - a.majoritet) || (b.mandat - a.mandat);
+      }});
+
+      const rader = sorterade.map(function(k) {{
+        const diff = k.mandat - post.majoritet;
+        const marke = k.majoritet
+          ? '<span class="kmarke ja">Majoritet</span>'
+          : '<span class="kmarke nej">' + diff + '</span>';
+        const bredd = Math.min(100, k.mandat / post.mandat_totalt * 100);
+        return '<div class="koalrad' + (k.majoritet ? ' vinner' : '') + '">' +
+          '<div class="knamn">' + k.namn +
+          '<span class="kpartier">' + k.partier + '</span></div>' +
+          '<div class="kbar"><div class="kfyll" style="width:' + bredd.toFixed(1) +
+          '%"></div><div class="kgrans" style="left:' +
+          (post.majoritet / post.mandat_totalt * 100).toFixed(2) + '%"></div></div>' +
+          '<div class="kmandat">' + k.mandat + '</div>' +
+          '<div class="kstatus">' + marke + '</div>' +
+          '<div class="kstyr">' + (k.styr2022 || 0) + '</div>' +
+          '</div>';
+      }}).join('');
+      koalhtml =
+        '<div class="koalblock">' +
+          '<div class="koalrubrik">Möjliga styren</div>' +
+          '<div class="koalhuvud"><span>Koalition</span><span></span>' +
+          '<span>Mandat</span><span></span><span>Styr nu</span></div>' +
+          rader +
+          '<p class="koalnot">Talet i sista kolumnen är hur många ' +
+          (niva === 'kommun' ? 'kommuner' : 'regioner') + ' koalitionen faktiskt ' +
+          'styr under mandatperioden 2022 till 2026. Prognosen visar var den ' +
+          'skulle kunna nå majoritet, inte var partierna vill styra ihop.</p>' +
+        '</div>';
+    }}
+
     detalj.innerHTML =
       '<div class="detaljkort">' +
         '<div class="detaljhuvud">' +
@@ -1552,6 +1656,7 @@ const LOKAL = {lokal_json};
           '<span>Stöd</span><span>Mot 2022</span><span>Mandat</span></div>' +
           staplar +
         '</div>' +
+        koalhtml +
         lokalnotis +
       '</div>';
     detalj.hidden = false;

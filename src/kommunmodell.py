@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 import config as cfg
+import lokala_koalitioner
 import lokala_partier
 import regionmodell
 import scb_data
@@ -322,6 +323,13 @@ def sammanfatta(prognos: pd.DataFrame, storlekar: dict[str, int] | None = None) 
         post["vanster_majoritet"] = vanster >= post["majoritet"]
         post["hoger_majoritet"] = hoger >= post["majoritet"]
         post["vagmastare"] = not (post["vanster_majoritet"] or post["hoger_majoritet"])
+
+        # Vilka av de vanligaste lokala koalitionerna når majoritet här. Vänster
+        # mot höger är för grovt lokalt: blocköverskridande styren är det
+        # enskilt vanligaste mönstret i kommunerna.
+        for koalition in lokala_koalitioner.utfall_for_omrade(mandat, platser):
+            post[f"koal_{koalition['id']}"] = koalition["mandat"]
+            post[f"koal_{koalition['id']}_majoritet"] = koalition["har_majoritet"]
 
         gamla_mandat = forra_mandat.get(omrade, {})
         for parti in partikolumner:

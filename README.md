@@ -226,6 +226,44 @@ Talet ska läsas som en storleksordning. Det finns inga mätningar av
 riksdagsvalet i en enskild valkrets, så stödet härleds via en kvot som varierar
 kraftigt mellan kommuner.
 
+## Koalitioner på lokal nivå
+
+Vänster mot höger räcker inte för kommuner och regioner. Efter valet 2022 har
+99 av 290 kommuner ett blocköverskridande styre, vilket är det enskilt
+vanligaste mönstret, och SCB räknar 84 olika partikonstellationer.
+
+Modellen räknar därför ut om de vanligaste koalitionerna når majoritet i varje
+område. Listan ligger i `data/lokala_koalitioner.csv` och bygger på SCB:s
+statistik över faktiska styren (tabellerna `ME0002KnP01` och `ME0002LanP01`):
+
+| Koalition | Styr 2022, kommuner | Regioner |
+|---|---|---|
+| Alliansen (M+KD+L+C) | 33 | 2 |
+| S+M | 17 | 1 |
+| S+C | 14 | 0 |
+| V+S | 12 | 0 |
+| Höger med SD (M+KD+L+SD) | 9 | 1 |
+| V+S+MP+C | 6 | 1 |
+
+Fördelningen av styrestyper 2022:
+
+| Typ | Kommuner | Regioner |
+|---|---|---|
+| Blocköverskridande | 99 (34 %) | 5 (25 %) |
+| Borgerligt med C | 50 (17 %) | 3 (15 %) |
+| Höger med SD | 34 (12 %) | 1 (5 %) |
+| Vänster med C | 32 (11 %) | 4 (20 %) |
+| Vänster | 28 (10 %) | 2 (10 %) |
+
+Notera skillnaden mellan vad som är aritmetiskt möjligt och vad som faktiskt
+sker. S+M kan nå majoritet i 134 kommuner enligt prognosen men styr bara i 17:
+de flesta väljer andra lösningar när alternativ finns. Kolumnen "Styr nu" i
+dashboarden visar det faktiska antalet, så att möjligheten inte förväxlas med
+sannolikheten.
+
+Lägg till egna koalitioner genom att fylla på CSV-filen. Partierna anges som
+`M+KD+L+C`.
+
 ## Justera modellen
 
 Alla parametrar ligger i CSV-filer och kan ändras utan kodändring:
