@@ -83,6 +83,25 @@ https://DITT-ANVÄNDARNAMN.github.io/valprognos-2026/
 
 Första bygget tar några minuter. Följ det under **Actions**-fliken.
 
+## Aktivera Pages: en fallgrop
+
+Att ge token `Pages`-behörighet räcker inte. Pages måste slås på i repots
+inställningar, och GitHub tillåter inte att en fine-grained token gör det.
+
+Symptomet är att bygget lyckas men `deploy-pages` faller med:
+
+```
+Failed to create deployment (status: 404)
+Ensure GitHub Pages has been enabled
+```
+
+Fixen är ett klick under **Settings → Pages → Source: GitHub Actions**.
+Kontrollera efteråt att `has_pages` blivit sant:
+
+```bash
+curl -s https://api.github.com/repos/Erikgranberg1982/valprognos | grep has_pages
+```
+
 ## Om något går fel
 
 **`git push` avvisas med "rejected"** betyder att repot inte var tomt. Kör
