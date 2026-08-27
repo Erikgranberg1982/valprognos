@@ -1,9 +1,9 @@
 institut,vikt,typiskt_urval,metod,kommentar
-SCB,1.35,9000,telefon+webb,Partisympatiundersökningen. Mycket stort urval men bara två mätningar per år.
-Novus,1.2,1800,webbpanel,Rekryterad slumpmässig panel. Historiskt god träffsäkerhet.
-Verian,1.20,1600,telefon+webb,Tidigare Kantar Sifo.
-Demoskop,1.05,1600,webbpanel,
-Ipsos,1.2,1500,telefon+webb,Mäter för Dagens Nyheter.
-Indikator,1.2,1400,webbpanel,
-Skop,0.50,1200,telefon,Glesa mätningar.
-Sentio,0.50,1000,webbpanel,Redovisar avrundade heltal. Historiskt större avvikelser.
+SCB,1.35,4500,slumpmässigt urval,Partisympatiundersökningen. Enda institutet med strikt slumpmässigt urval ur befolkningsregistret. Utskick till cirka 9000 personer varav drygt 4500 svarar. Publicerar fullständig metodbeskrivning med svarsfrekvens och bortfallsanalys. Bara en mätning per år sedan 2023.
+Verian,1.20,3000,slumpmässigt urval webb och telefon,Tidigare Kantar Sifo. Störst av de återkommande barometrarna. Slumpmässigt urval ur befolkningen. Redovisar urvalsstorlek och viktningsvariabler för varje mätning: 3043 intervjuer i augusti 2026.
+Novus,1.15,2330,flerkanalsurval,Rekryterar via telefon SMS e-post och post. Publicerar PDF med hela metodbeskrivningen och historik över intervjuantal. Normalt 1900 till 2700 intervjuer med förstärkta mätningar närmast valet.
+Indikator,1.00,2500,postenkät med slumpmässigt urval,Sveriges Radios väljarbarometer. Slumpmässigt urval med postala enkäter och möjlighet att svara via webb eller telefon. Redovisar metod men mindre detaljerat än Verian och Novus.
+Demoskop,0.95,2100,självrekryterad webbpanel,Iniziopanelen. Redovisar urvalsstorlek och viktningsvariabler per mätning men panelen är självrekryterad vilket ger sämre representativitet än ett slumpmässigt urval.
+Ipsos,0.95,1800,webbpanel med visst slumpurval,Mäter för Dagens Nyheter. Kombinerar slumpmässigt urval med egen webbpanel. Publicerar inte urvalsstorlek per mätning i sina pressmeddelanden.
+Sentio,0.50,1000,självrekryterad webbpanel,Redovisar avrundade heltal och publicerar ingen detaljerad metodbeskrivning eller urvalsstorlek per mätning. Göteborgs universitets valforskningsprogram utesluter Sentio ur sina sammanvägningar med hänvisning till metodbrister. Historiskt stora avvikelser.
+Skop,0.50,1200,telefon och post,Publicerar ingen aktuell metodbeskrivning. Har inte publicerat någon mätning sedan juni 2024 och ligger därför utanför modellens tidsfönster.

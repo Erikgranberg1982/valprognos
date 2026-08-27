@@ -65,7 +65,33 @@ institut som redovisar avrundade heltal med riktningssuffix (`9+ %`, `32- %`).
 |---|---|
 | Institutets kvalitet | Från `data/institut_vikter.csv` |
 | Urvalsstorlek | `sqrt(urval / 1500)`, eftersom precision växer med kvadratroten |
-| Färskhet | `0.5 ^ (ålder / halveringstid)`, standard 30 dagar |
+| Färskhet | `0.5 ^ (ålder / halveringstid)`, standard 21 dagar |
+
+### Institutsvikter och urval
+
+Urvalsstorlekarna är verifierade mot instituten egna publiceringar i augusti
+2026, inte uppskattade:
+
+| Institut | Urval | Rekrytering | Vikt |
+|---|---|---|---|
+| SCB | 4 500 svarande av 9 000 utskick | Slumpmässigt ur befolkningsregistret | 1,35 |
+| Verian | 3 043 | Slumpmässigt urval | 1,20 |
+| Novus | 1 900–2 700, median 2 330 | Flerkanal: telefon, SMS, e-post, post | 1,15 |
+| Indikator | 2 000–3 000 | Postenkät med slumpmässigt urval | 1,00 |
+| Demoskop | 2 016 | Självrekryterad webbpanel | 0,95 |
+| Ipsos | ~1 800 | Webbpanel med visst slumpurval | 0,95 |
+| Sentio | ~1 000 | Självrekryterad webbpanel | 0,50 |
+| Skop | ~1 200 | Telefon och post | 0,50 |
+
+Vikten följer två principer. **Rekryteringsmetod:** ett slumpmässigt urval ur
+befolkningsregistret ger bättre representativitet än en självrekryterad panel,
+oavsett storlek. **Metodtransparens:** institut som publicerar urvalsstorlek,
+viktningsvariabler och svarsfrekvens per mätning väger tyngre än de som inte
+gör det, eftersom redovisningen går att granska.
+
+Två noteringar. SCB har högst vikt men litet genomslag, cirka 3 procent, eftersom
+de bara mäter en gång per år sedan 2023 och tidsvikten då tar över. Skop har inte
+publicerat sedan juni 2024 och ligger utanför modellens tidsfönster.
 
 **3. Husfaktorer.** Varje instituts systematiska avvikelse skattas genom att
 jämföra dess mätningar med ett tidsviktat konsensus från *övriga* institut, så
