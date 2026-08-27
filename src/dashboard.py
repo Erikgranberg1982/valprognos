@@ -1171,8 +1171,9 @@ footer strong {{ color:var(--text); }}
 
 <div class="hero"><div class="heroinner">
   <span class="etikett">Valprognos</span>
-  <h1>Riksdagsvalet 2026</h1>
-  <p class="ingress">Sammanvägning av {meta['antal_matningar']} opinionsmätningar från
+  <h1>Valet 2026</h1>
+  <p class="ingress">Prognos för alla tre val: riksdag, region och kommun.
+  Bygger på {meta['antal_matningar']} opinionsmätningar från
   {meta['antal_institut']} institut, justerade för husfaktorer och simulerade
   {sim_text} gånger.</p>
   <div class="nyckeltal">
