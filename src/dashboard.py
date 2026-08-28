@@ -344,9 +344,9 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     <div class="notis" id="lokalnotis"></div>
   </div>
 
-  {metod_html}
-
   {lokala_matningar_html}
+
+  {metod_html}
 </div>
 """
     kommun_json = json.dumps(kommundata, ensure_ascii=False, separators=(",", ":"))
@@ -534,7 +534,7 @@ def _lokala_matningar_html() -> str:
         </tr>""")
 
     return f"""
-<h2>Lokala mätningar</h2>
+<h2 id="lokala-matningar">Lokala mätningar</h2>
 <div class="sektionsrubrik">Källor för namngivna lokala partier</div>
 <div class="tabellwrap"><table>
   <thead><tr><th>Parti</th><th>Nivå</th><th>Område</th><th class="tal">Stöd</th>
@@ -996,6 +996,11 @@ tr.klickbar:focus-visible {{ outline:2px solid var(--korall); outline-offset:-2p
   opacity:.5; vertical-align:-2px; }}
 .radpil .pil {{ width:14px; height:14px; }}
 .omradesnamn {{ font-weight:600; }}
+.lokalprick {{ display:inline-block; margin-left:7px; font-size:10.5px;
+  font-weight:700; padding:1px 7px; border-radius:28px;
+  background:var(--korall-ljus); color:var(--korall-mork); cursor:help;
+  vertical-align:1px; }}
+.lokalnotis a {{ color:var(--korall-mork); font-weight:700; }}
 tr.klickbar:hover .radpil {{ opacity:1; }}
 tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 
@@ -1758,7 +1763,7 @@ const LOKAL = {lokal_json};
            'mätning på en annan nivå.');
       lokalnotis = '<div class="lokalnotis"><strong>' + post.lokal.namn +
         '</strong> redovisas separat i stället för att ingå i ÖVRIGA. ' + hur +
-        '</div>';
+        ' <a href="#lokala-matningar">Se alla lokala mätningar</a></div>';
     }}
 
     /* Koalitionerna visar vilka konstellationer som når majoritet. Vänster mot
@@ -1913,8 +1918,15 @@ const LOKAL = {lokal_json};
         const v = p.stod[x];
         return '<td class="tal">' + (v === undefined ? '–' : v.toFixed(1)) + '</td>';
       }}).join('');
+      /* Områden med en egen lokal mätning märks ut, så att det syns i listan
+         och inte bara när man öppnat detaljvyn. */
+      const lokalmarke = p.lokal
+        ? '<span class="lokalprick" title="' + p.lokal.namn +
+          ' redovisas separat, se Lokala mätningar">' + p.lokal.namn + '</span>'
+        : '';
       return '<tr class="klickbar" data-kod="' + p.kod + '">' +
         '<td class="inst"><span class="omradesnamn">' + p.namn + '</span>' +
+        lokalmarke +
         '<span class="radpil" aria-hidden="true">' + PIL + '</span></td>' + stod +
         '<td class="tal dim">' + p.mandat_totalt + '</td>' +
         '<td class="tal blockcell v">' + (p.m_vanster || 0) + '</td>' +
