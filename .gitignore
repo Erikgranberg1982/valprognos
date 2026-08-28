@@ -13,3 +13,7 @@ output/
 .env.*
 *.pem
 *.key
+
+# Färdigpaketerade filer för publicering. Genereras vid behov.
+publicering/
+valprognos-2026.zip
