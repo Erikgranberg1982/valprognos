@@ -566,12 +566,7 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
 <div class="notis">Lokala mätningar vägs samman med modellens skattning på samma
 sätt som SCB:s partisympatiundersökning i regionprognosen, men med högre vikt
 eftersom de gäller exakt det område de används på. Vikten halveras på
-{cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar mot riksmätningarnas 21, eftersom
-alternativet inte är en färskare mätning utan en extrapolering från rikstrenden.
-
-En mätning används bara om samtliga riksdagspartier redovisats. Att justera
-några partier mot mätningen och låta resten stå kvar ger en fördelning som
-varken speglar mätningen eller modellen.</div>
+{cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar.</div>
 """
 
 
@@ -754,6 +749,17 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Valprognos 2026</title>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8C4Y5LMHXS"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{dataLayer.push(arguments);}}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8C4Y5LMHXS');
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
