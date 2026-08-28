@@ -257,6 +257,7 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
     ut["lokalt_parti"] = None
     ut["lokalt_stod"] = np.nan
     ut["lokalt_matt"] = False
+    ut["lokalt_vikt"] = np.nan
     ut["lokalt_kalla"] = None
 
     riksdagspartier = [k for k in partikolumner if k != "ÖVRIGA"]
@@ -267,7 +268,13 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
             continue
 
         ovriga = float(ut.at[omrade, "ÖVRIGA"])
-        eget, rest = lokala_partier.dela_upp_ovriga(ovriga, post["stod"])
+
+        # Väg mätningen mot modellens egen skattning, som är områdets ÖVRIGA
+        # skalat med rikstrenden. En färsk mätning dominerar, en äldre glider
+        # tillbaka mot skattningen. Se lokala_partier.vikt_for_matning.
+        vagt = lokala_partier.vagt_stod(post["stod"], ovriga,
+                                        post.get("vikt", 1.0))
+        eget, rest = lokala_partier.dela_upp_ovriga(ovriga, vagt)
 
         # Det parti tar utöver den gamla ÖVRIGA-posten måste komma någonstans.
         overskott = max(0.0, eget - ovriga)
@@ -284,6 +291,7 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
         ut.at[omrade, "lokalt_parti"] = post["parti"]
         ut.at[omrade, "lokalt_stod"] = eget
         ut.at[omrade, "lokalt_matt"] = post["matt"]
+        ut.at[omrade, "lokalt_vikt"] = post.get("vikt", 1.0)
         ut.at[omrade, "lokalt_kalla"] = post.get("kalla")
         ut.at[omrade, "ÖVRIGA"] = rest
 

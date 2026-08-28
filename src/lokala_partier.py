@@ -17,6 +17,7 @@ därför separat.
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 
 import numpy as np
@@ -80,6 +81,26 @@ NIVAKVOT = {
 }
 
 
+def _kallrad(tabell: pd.DataFrame, parti: str):
+    """Raden med den faktiska mätningen för ett parti, om någon finns."""
+    egna = tabell[(tabell["parti"] == parti) & tabell["stod"].notna()]
+    return egna.iloc[0] if not egna.empty else None
+
+
+def _urval(kalltext: str | None) -> int | None:
+    """Plockar ut antalet svarande ur källtexten, t.ex. "(1000 svarande)"."""
+    if not kalltext:
+        return None
+    m = re.search(r"(\d[\d\s]{2,6})\s*(?:svarande|intervjuer|personer)",
+                  str(kalltext), re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        return int(m.group(1).replace(" ", ""))
+    except ValueError:
+        return None
+
+
 def _skala_mellan_nivaer(tabell: pd.DataFrame, parti: str, niva: str,
                          ovriga_kvot: float | None = None) -> float | None:
     """Skattar stödet på en nivå utifrån en mätning på en annan.
@@ -122,6 +143,50 @@ def _skala_mellan_nivaer(tabell: pd.DataFrame, parti: str, niva: str,
     return None
 
 
+def vikt_for_matning(datum_text: str | None, urval: int | None = None) -> float:
+    """Hur tungt en lokal mätning ska väga mot modellens egen skattning.
+
+    Riksmätningar tappar halva sin vikt var tjugoförsta dag, eftersom det alltid
+    finns en färskare mätning av samma sak. För en lokal mätning är alternativet
+    inte en nyare mätning utan en extrapolering från rikstrenden, som inte vet
+    något om just det området. En äldre lokal mätning är därför fortfarande
+    bättre underlag än ingen alls, och avklingningen är satt till 120 dagar.
+
+    Vikten toppar vid LOKAL_MATNING_MAXVIKT, under ett, eftersom även en färsk
+    mätning har urvalsosäkerhet och modellens skattning bär information om vad
+    som hänt nationellt sedan mätningen gjordes.
+
+    Urvalsstorleken justerar vikten på samma sätt som för riksmätningar, med
+    kvadratroten mot ett referensurval på tusen svarande, vilket är typiskt för
+    en lokal mätning.
+    """
+    from datetime import date
+
+    vikt = cfg.LOKAL_MATNING_MAXVIKT
+
+    if datum_text:
+        try:
+            matdatum = date.fromisoformat(str(datum_text).strip()[:10])
+            alder = max(0, (date.today() - matdatum).days)
+            vikt *= 0.5 ** (alder / cfg.LOKAL_MATNING_HALVERINGSTID)
+        except ValueError:
+            pass
+
+    if urval and urval > 0:
+        # Dämpad urvalsjustering: en dubbelt så stor mätning väger cirka
+        # fyrtio procent mer, inte dubbelt.
+        vikt *= min(1.3, (urval / 1000.0) ** 0.5)
+
+    return max(0.0, min(1.0, vikt))
+
+
+def vagt_stod(matt_varde: float, modellens_skattning: float,
+              vikt: float) -> float:
+    """Väger samman en lokal mätning med modellens egen skattning."""
+    v = max(0.0, min(1.0, vikt))
+    return v * matt_varde + (1.0 - v) * modellens_skattning
+
+
 def dela_upp_ovriga(stod_ovriga: float, parti_stod: float | None) -> tuple[float, float]:
     """Delar ÖVRIGA i det namngivna partiet och resterande lokala partier.
 
@@ -160,10 +225,18 @@ def for_omrade(niva: str, omrade_kod: str,
     if stod is None:
         return None
 
+    # Vikten gäller bara en mätt siffra. Ett skalat värde är redan härlett ur
+    # en mätning på annan nivå och ärver den mätningens vikt.
+    kallrad = rad if matt else _kallrad(tabell, parti)
+    vikt = vikt_for_matning(
+        (kallrad["datum"] if kallrad is not None else None),
+        _urval(kallrad["kalla"] if kallrad is not None else None))
+
     return {
         "parti": parti,
         "stod": stod,
         "matt": matt,
+        "vikt": vikt,
         "kalla": rad["kalla"] or None,
         "datum": rad["datum"] or None,
         "forra_valet": (float(rad["forra_valet"])

@@ -312,7 +312,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         f'<th class="tal"><button class="sortknapp" data-sort="stod:{p}">{p}</button></th>'
         for p in partier)
     metod_html = _metod_lokal()
-    lokala_matningar_html = _lokala_matningar_html()
+    lokala_matningar_html = _lokala_matningar_html(regioner, kommuner)
 
     html = f"""
 <div id="lokalvy" hidden>
@@ -488,7 +488,7 @@ def _metod_lokal() -> str:
 """
 
 
-def _lokala_matningar_html() -> str:
+def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
     """Redovisar de lokala mätningar som används i prognosen.
 
     Riksdagsmätningarna listas redan i sidan. Lokala mätningar är få och
@@ -505,21 +505,38 @@ def _lokala_matningar_html() -> str:
     nivanamn = {"kommun": "Kommunval", "region": "Regionval",
                 "riksdagsvalkrets": "Riksdagsval i valkretsen"}
 
+    # Vad modellen faktiskt räknar med, efter viktning mot egen skattning.
+    anvant = {}
+    for df, niva in ((regioner, "region"), (kommuner, "kommun")):
+        if df is None or df.empty:
+            continue
+        for kod, r in df.iterrows():
+            if r.get("lokalt_parti"):
+                anvant[(niva, str(kod))] = float(r["lokalt_stod"])
+
     rader = []
     for _, rad in tabell.iterrows():
         matt = pd.notna(rad["stod"])
+        post = lokala_partier.for_omrade(rad["niva"], rad["omrade_kod"])
+
         if matt:
-            varde = f'<strong>{rad["stod"]:.1f}%</strong>'
-            markering = '<span class="kallmarke matt">Mätt</span>'
+            mattext = f'<strong>{rad["stod"]:.1f}%</strong>'
+            markering = '<span class="kallmarke matt">Egen mätning</span>'
             kalla = rad["kalla"] or "källa saknas"
             datum = rad["datum"] or ""
         else:
-            # Visa det skalade värdet så att läsaren ser vad modellen räknar med.
-            skattat = lokala_partier.for_omrade(rad["niva"], rad["omrade_kod"])
-            varde = (f'{skattat["stod"]:.1f}%' if skattat else "–")
+            mattext = "–"
             markering = '<span class="kallmarke skalat">Skalat</span>'
-            kalla = "Ingen mätning finns. Skalat från partiets mätning på annan nivå."
+            kalla = "Ingen mätning på denna nivå. Skalat från mätningen ovan."
             datum = ""
+
+        brukas = anvant.get((rad["niva"], str(rad["omrade_kod"])))
+        if brukas is None and post:
+            brukas = post["stod"]
+        brukstext = f'{brukas:.1f}%' if brukas is not None else "–"
+
+        vikt = post.get("vikt") if post else None
+        vikttext = f'{vikt*100:.0f}%' if vikt is not None else "–"
 
         forra = (f'{rad["forra_valet"]:.1f}%' if pd.notna(rad["forra_valet"]) else "–")
         rader.append(f"""
@@ -527,8 +544,10 @@ def _lokala_matningar_html() -> str:
           <td class="inst">{rad['parti']}</td>
           <td>{nivanamn.get(rad['niva'], rad['niva'])}</td>
           <td>{rad['omrade_namn']}</td>
-          <td class="tal">{varde}</td>
+          <td class="tal">{mattext}</td>
+          <td class="tal"><strong>{brukstext}</strong></td>
           <td class="tal dim">{forra}</td>
+          <td class="tal"><span class="viktbricka">{vikttext}</span></td>
           <td>{markering}</td>
           <td class="kallcell">{kalla}{(' · ' + datum) if datum else ''}</td>
         </tr>""")
@@ -537,15 +556,26 @@ def _lokala_matningar_html() -> str:
 <h2 id="lokala-matningar">Lokala mätningar</h2>
 <div class="sektionsrubrik">Källor för namngivna lokala partier</div>
 <div class="tabellwrap"><table>
-  <thead><tr><th>Parti</th><th>Nivå</th><th>Område</th><th class="tal">Stöd</th>
-    <th class="tal">2022</th><th>Underlag</th><th>Källa</th></tr></thead>
+  <thead><tr><th>Parti</th><th>Nivå</th><th>Område</th>
+    <th class="tal">Mätt</th><th class="tal">Används</th>
+    <th class="tal">2022</th><th class="tal">Vikt</th>
+    <th>Underlag</th><th>Källa</th></tr></thead>
   <tbody>{''.join(rader)}</tbody>
 </table></div>
 <div class="notis">SCB redovisar lokala partier samlat som ÖVRIGA, så de kan
 normalt inte följas var för sig. Där ett parti har en egen publicerad mätning
-bryts det ut och redovisas med namn. Saknas mätning på en nivå skalas stödet
-från den nivå som har en, med partiets eget förhållande mellan nivåerna i förra
-valet. Övriga lokala partier hålls på förra valets nivå.</div>
+bryts det ut och redovisas med namn.
+
+Vikten anger hur mycket mätningen väger mot modellens egen skattning, som är
+områdets resultat 2022 skalat med rikstrenden. En lokal mätning tappar vikt
+långsammare än en riksmätning, halva vikten på
+{cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar mot 21, eftersom alternativet inte
+är en färskare mätning utan en extrapolering som inte vet något om just det
+området. Taket är {cfg.LOKAL_MATNING_MAXVIKT*100:.0f} procent, eftersom även en
+färsk mätning har urvalsosäkerhet.
+
+Saknas mätning på en nivå skalas stödet från den nivå som har en. Övriga lokala
+partier hålls på förra valets nivå.</div>
 """
 
 

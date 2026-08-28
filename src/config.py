@@ -121,6 +121,12 @@ ANTAL_SIMULERINGAR = int(_P.get("antal_simuleringar", 40000))
 
 ANVAND_VALDAGSKORRIGERING = bool(_P.get("anvand_valdagskorrigering", 0))
 
+# Lokala mätningar tappar vikt långsammare än riksmätningar. En lokal mätning
+# mäter det område den gäller, medan alternativet är en extrapolering från
+# rikstrenden. Se lokala_partier.vikt_for_matning.
+LOKAL_MATNING_HALVERINGSTID = _P.get("lokal_matning_halveringstid", 120.0)
+LOKAL_MATNING_MAXVIKT = _P.get("lokal_matning_maxvikt", 0.9)
+
 
 def _las_valdagskorrigering():
     """Historiskt observerad skevhet per parti, i procentenheter.
