@@ -418,22 +418,24 @@ def _metod_lokal() -> str:
   </div>
 
   <table class="metodtabell">
-    <thead><tr><th>Metod</th><th class="tal">Regionval</th>
+    <thead><tr><th>Träffsäkerhet</th><th class="tal">Regionval</th>
       <th class="tal">Kommunval</th></tr></thead>
     <tbody>
-      <tr><td><strong>Områdets resultat × rikstrend</strong></td>
-        <td class="tal pos">1,18</td><td class="tal pos">1,95</td></tr>
-      <tr><td>Rikstrend × profil + skillnad</td>
-        <td class="tal">1,49</td><td class="tal">2,40</td></tr>
+      <tr><td>Medianfel</td>
+        <td class="tal pos">1,0</td><td class="tal pos">1,2</td></tr>
+      <tr><td>Medelfel</td>
+        <td class="tal">1,2</td><td class="tal">2,0</td></tr>
+      <tr><td>Nio fall av tio inom</td>
+        <td class="tal">2,4</td><td class="tal">4,6</td></tr>
+      <tr><td>Andel inom 3 procentenheter</td>
+        <td class="tal">96%</td><td class="tal">81%</td></tr>
     </tbody>
   </table>
-  <p class="metodnot">Medelabsolutfel i procentenheter, uppmätt genom att
-  förutsäga valet 2022 med enbart data från 2018. Den första metoden används.
-  Den andra prövades först men var både mindre träffsäker och kunde ge orimliga
-  nivåer: ett parti med tre gånger rikets stöd i ett område kunde skalas upp så
-  att radsumman överskred hundra procent, varpå normaliseringen tryckte ner
-  alla andra partier. Det gjorde att ett parti kunde tappa lokalt trots att det
-  gick fram nationellt.</p>
+  <p class="metodnot">Procentenheter, uppmätt genom att förutsäga valet 2022
+  med enbart data från 2018. Kommunerna är svårare än regionerna eftersom de är
+  mindre och lokala förhållanden väger tyngre. Enstaka kommuner slår kraftigt
+  fel när ett parti byter skepnad lokalt, exempelvis genom en utbrytning eller
+  en ny lista, vilket är skälet att medelfelet är högre än medianfelet.</p>
 
   <div class="metodrutor">
     <div class="metodruta">
