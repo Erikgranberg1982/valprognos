@@ -312,6 +312,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         f'<th class="tal"><button class="sortknapp" data-sort="stod:{p}">{p}</button></th>'
         for p in partier)
     metod_html = _metod_lokal()
+    lokala_matningar_html = _lokala_matningar_html()
 
     html = f"""
 <div id="lokalvy" hidden>
@@ -344,6 +345,8 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
   </div>
 
   {metod_html}
+
+  {lokala_matningar_html}
 </div>
 """
     kommun_json = json.dumps(kommundata, ensure_ascii=False, separators=(",", ":"))
@@ -460,9 +463,7 @@ def _metod_lokal() -> str:
       <p>Vänster mot höger är för grovt lokalt. Efter valet 2022 har 101 av 290
       kommuner ett blocköverskridande styre, och SCB räknar 84 olika
       konstellationer. C räknas därför inte till något block, och tabellen visar
-      mandatläge i stället för blockmajoritet: en tidigare version angav
-      vänstermajoritet i 57 procent av kommunerna, medan faktiskt vänsterstyre
-      var 20 procent.</p>
+      mandatläge i stället för blockmajoritet.</p>
     </div>
     <div class="metodruta">
       <div class="mrubrik">Lokala partier</div>
@@ -485,6 +486,68 @@ def _metod_lokal() -> str:
   inte i regionprognosen.</p>
 </div>
 """
+
+
+def _lokala_matningar_html() -> str:
+    """Redovisar de lokala mätningar som används i prognosen.
+
+    Riksdagsmätningarna listas redan i sidan. Lokala mätningar är få och
+    kommer från spridda källor, så de förtjänar en egen redovisning med källa
+    och datum. Där ett stöd är skalat från en annan nivå framgår det, eftersom
+    ett skalat värde är osäkrare än ett mätt.
+    """
+    import lokala_partier
+
+    tabell = lokala_partier.las()
+    if tabell.empty:
+        return ""
+
+    nivanamn = {"kommun": "Kommunval", "region": "Regionval",
+                "riksdagsvalkrets": "Riksdagsval i valkretsen"}
+
+    rader = []
+    for _, rad in tabell.iterrows():
+        matt = pd.notna(rad["stod"])
+        if matt:
+            varde = f'<strong>{rad["stod"]:.1f}%</strong>'
+            markering = '<span class="kallmarke matt">Mätt</span>'
+            kalla = rad["kalla"] or "källa saknas"
+            datum = rad["datum"] or ""
+        else:
+            # Visa det skalade värdet så att läsaren ser vad modellen räknar med.
+            skattat = lokala_partier.for_omrade(rad["niva"], rad["omrade_kod"])
+            varde = (f'{skattat["stod"]:.1f}%' if skattat else "–")
+            markering = '<span class="kallmarke skalat">Skalat</span>'
+            kalla = "Ingen mätning finns. Skalat från partiets mätning på annan nivå."
+            datum = ""
+
+        forra = (f'{rad["forra_valet"]:.1f}%' if pd.notna(rad["forra_valet"]) else "–")
+        rader.append(f"""
+        <tr>
+          <td class="inst">{rad['parti']}</td>
+          <td>{nivanamn.get(rad['niva'], rad['niva'])}</td>
+          <td>{rad['omrade_namn']}</td>
+          <td class="tal">{varde}</td>
+          <td class="tal dim">{forra}</td>
+          <td>{markering}</td>
+          <td class="kallcell">{kalla}{(' · ' + datum) if datum else ''}</td>
+        </tr>""")
+
+    return f"""
+<h2>Lokala mätningar</h2>
+<div class="sektionsrubrik">Källor för namngivna lokala partier</div>
+<div class="tabellwrap"><table>
+  <thead><tr><th>Parti</th><th>Nivå</th><th>Område</th><th class="tal">Stöd</th>
+    <th class="tal">2022</th><th>Underlag</th><th>Källa</th></tr></thead>
+  <tbody>{''.join(rader)}</tbody>
+</table></div>
+<div class="notis">SCB redovisar lokala partier samlat som ÖVRIGA, så de kan
+normalt inte följas var för sig. Där ett parti har en egen publicerad mätning
+bryts det ut och redovisas med namn. Saknas mätning på en nivå skalas stödet
+från den nivå som har en, med partiets eget förhållande mellan nivåerna i förra
+valet. Övriga lokala partier hålls på förra valets nivå.</div>
+"""
+
 
 
 def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
@@ -701,11 +764,15 @@ html {{ scroll-behavior:smooth; }}
 body {{ margin:0; background:var(--bg); color:var(--text);
   font-family:'Work Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }}
-.wrap {{ max-width:1140px; margin:0 auto; padding:0 24px 96px; }}
+/* Sidans bredd. Kommuntabellen med sjutton kolumner behöver omkring 1190
+   pixlar, så 1320 rymmer den utan horisontell scroll och lämnar marginal.
+   Läsbar text mår illa av alltför långa rader, så brödtext och metodavsnitt
+   begränsas separat nedan. */
+.wrap {{ max-width:1320px; margin:0 auto; padding:0 28px 96px; }}
 
 /* --- Sidhuvud --- */
 .topp {{ background:var(--sand); border-bottom:1px solid var(--linje); margin-bottom:0; }}
-.toppinner {{ max-width:1140px; margin:0 auto; padding:16px 24px;
+.toppinner {{ max-width:1320px; margin:0 auto; padding:16px 28px;
   display:flex; align-items:center; justify-content:space-between; gap:20px; }}
 .logo {{ display:inline-flex; align-items:center; text-decoration:none; }}
 /* Färgvarianten är bred med bubblorna till vänster, den vita är kvadratisk med
@@ -737,7 +804,7 @@ body {{ margin:0; background:var(--bg); color:var(--text);
 .temaknapp:hover {{ border-color:var(--korall); color:var(--korall); }}
 
 .hero {{ background:var(--sand); padding:38px 0 46px; }}
-.heroinner {{ max-width:1140px; margin:0 auto; padding:0 24px; }}
+.heroinner {{ max-width:1320px; margin:0 auto; padding:0 28px; }}
 .etikett {{ display:inline-block; background:var(--korall); color:#fff;
   font-size:11px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
   padding:5px 13px; border-radius:28px; margin-bottom:16px; }}
@@ -754,9 +821,12 @@ h2 {{ font-size:12px; text-transform:uppercase; letter-spacing:1.6px;
   color:var(--svag); margin:52px 0 4px; font-weight:700; }}
 .sektionsrubrik {{ font-size:25px; font-weight:700; letter-spacing:-.7px;
   margin:0 0 18px; }}
+/* Radlängd. Vid 1320 pixlar blir löpande text för bred för bekväm läsning,
+   så textblock begränsas till omkring nittio tecken medan tabeller och
+   grafik får utnyttja hela bredden. */
 .notis {{ background:var(--panel); border-left:3px solid var(--korall);
   padding:14px 18px; border-radius:0 8px 8px 0; font-size:13.5px; color:var(--svag);
-  margin-top:14px; }}
+  margin-top:14px; max-width:900px; }}
 
 /* --- Kort --- */
 .kort {{ background:var(--kortbg); border:1px solid var(--linje); border-radius:16px;
@@ -871,7 +941,7 @@ tr.utanfor td {{ opacity:.5; }}
 
 .kammarkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:26px 24px 20px; box-shadow:var(--skugga); }}
-.kammare {{ width:100%; max-width:620px; height:auto; display:block; margin:0 auto; }}
+.kammare {{ width:100%; max-width:700px; height:auto; display:block; margin:0 auto; }}
 .plats {{ transition:opacity .12s; }}
 .kammare:hover .plats {{ opacity:.42; }}
 .kammare .plats:hover {{ opacity:1; }}
@@ -950,7 +1020,7 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 
 .klicktips {{ display:flex; align-items:center; gap:9px; margin:0 0 14px;
   padding:11px 15px; background:var(--korall-ljus); border-radius:10px;
-  font-size:13.5px; font-weight:600; color:var(--korall-mork); }}
+  font-size:13.5px; font-weight:600; color:var(--korall-mork); max-width:900px; }}
 .klicktips .pil {{ flex:none; width:16px; height:16px; }}
 
 .detaljkort {{ background:var(--kortbg); border:1px solid var(--linje);
@@ -1007,6 +1077,11 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
   color:var(--svag); font-weight:700; padding-bottom:5px; }}
 .dstapelhuvud span:nth-child(3), .dstapelhuvud span:nth-child(4) {{ text-align:right; }}
 .dstapelhuvud span:nth-child(5) {{ text-align:right; }}
+.kallmarke {{ display:inline-block; font-size:11px; font-weight:700;
+  padding:2px 9px; border-radius:28px; white-space:nowrap; }}
+.kallmarke.matt {{ background:rgba(125,186,116,.2); color:var(--gron); }}
+.kallmarke.skalat {{ background:var(--panel); color:var(--svag); }}
+.kallcell {{ font-size:12.5px; color:var(--svag); max-width:340px; }}
 .metodkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:26px; box-shadow:var(--skugga); }}
 .metodingress {{ font-size:15px; margin:0 0 22px; max-width:660px; }}
@@ -1149,6 +1224,9 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 
 footer {{ margin-top:60px; padding:26px 0 0; border-top:2px solid var(--korall);
   color:var(--svag); font-size:12.5px; line-height:1.75; }}
+footer strong:first-child {{ display:inline; }}
+footer {{ max-width:1320px; }}
+.metodkort p, .metodnot, .metodingress {{ max-width:820px; }}
 footer strong {{ color:var(--text); }}
 @media (max-width:640px) {{
   .nyckeltal {{ gap:22px; }} .blockmandat {{ font-size:42px; }}
