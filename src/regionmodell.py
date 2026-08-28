@@ -238,21 +238,15 @@ def prognos_per_region(riksprognos: pd.Series, anvand_psu: bool = True,
 
 def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
                             partikolumner: list[str]) -> pd.DataFrame:
-    """Lyfter ut namngivna lokala partier ur ÖVRIGA där mätningar finns.
+    """Väger in lokala mätningar där sådana finns.
 
-    ÖVRIGA är en samlingspost. För de områden där ett lokalt parti har en egen
-    mätning redovisas partiet med namn, och resten blir kvar som ÖVRIGA. Ett
-    namngivet parti prövas då mot spärren för sig, vilket ger ett rättvisare
-    mandatutfall.
+    Mätningen vägs samman med modellens skattning partivis och normaliseras,
+    på samma sätt som partisympatiundersökningen i regionmodellen. Ett lokalt
+    parti som ingår i mätningen bryts samtidigt ut ur ÖVRIGA och redovisas med
+    namn.
 
-    Anropas efter normaliseringen. Om partiet mäts högre än ÖVRIGA-posten tas
-    skillnaden proportionellt från de övriga partierna, eftersom ett växande
-    lokalt parti vinner röster från riksdagspartierna och inte bara från andra
-    lokala. Summan förblir hundra procent.
+    Bara fullständiga mätningar används, se lokala_partier.matning_for_omrade.
     """
-    if "ÖVRIGA" not in df.columns:
-        return df
-
     ut = df.copy()
     ut["lokalt_parti"] = None
     ut["lokalt_stod"] = np.nan
@@ -260,40 +254,25 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
     ut["lokalt_vikt"] = np.nan
     ut["lokalt_kalla"] = None
 
-    riksdagspartier = [k for k in partikolumner if k != "ÖVRIGA"]
-
     for omrade in ut.index:
-        post = lokala_partier.for_omrade(niva, str(omrade))
-        if not post:
+        aktuellt = {k: float(ut.at[omrade, k]) for k in partikolumner
+                    if k in ut.columns}
+        justerat, matning = lokala_partier.blanda_in_matning(
+            aktuellt, niva, str(omrade))
+        if matning is None or not matning["anvands"]:
             continue
 
-        ovriga = float(ut.at[omrade, "ÖVRIGA"])
+        for parti in partikolumner:
+            if parti in justerat:
+                ut.at[omrade, parti] = justerat[parti]
 
-        # Väg mätningen mot modellens egen skattning, som är områdets ÖVRIGA
-        # skalat med rikstrenden. En färsk mätning dominerar, en äldre glider
-        # tillbaka mot skattningen. Se lokala_partier.vikt_for_matning.
-        vagt = lokala_partier.vagt_stod(post["stod"], ovriga,
-                                        post.get("vikt", 1.0))
-        eget, rest = lokala_partier.dela_upp_ovriga(ovriga, vagt)
-
-        # Det parti tar utöver den gamla ÖVRIGA-posten måste komma någonstans.
-        overskott = max(0.0, eget - ovriga)
-        if overskott > 0:
-            bas = sum(float(ut.at[omrade, k]) for k in riksdagspartier)
-            if bas > overskott:
-                for k in riksdagspartier:
-                    andel = float(ut.at[omrade, k]) / bas
-                    ut.at[omrade, k] = float(ut.at[omrade, k]) - overskott * andel
-            else:
-                # Orimligt stort överskott; behåll posten oförändrad.
-                continue
-
-        ut.at[omrade, "lokalt_parti"] = post["parti"]
-        ut.at[omrade, "lokalt_stod"] = eget
-        ut.at[omrade, "lokalt_matt"] = post["matt"]
-        ut.at[omrade, "lokalt_vikt"] = post.get("vikt", 1.0)
-        ut.at[omrade, "lokalt_kalla"] = post.get("kalla")
-        ut.at[omrade, "ÖVRIGA"] = rest
+        lokalt = matning["lokalt_parti"]
+        if lokalt and lokalt in justerat:
+            ut.at[omrade, "lokalt_parti"] = lokalt
+            ut.at[omrade, "lokalt_stod"] = justerat[lokalt]
+            ut.at[omrade, "lokalt_matt"] = True
+            ut.at[omrade, "lokalt_vikt"] = matning["vikt"]
+            ut.at[omrade, "lokalt_kalla"] = matning["kalla"]
 
     return ut
 

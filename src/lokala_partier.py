@@ -26,27 +26,43 @@ import pandas as pd
 import config as cfg
 
 ROT = Path(__file__).resolve().parent.parent
-FIL = ROT / "data" / "lokala_partier.csv"
+
 
 # Valkretsens spärr för att nå riksdagen utan att klara fyraprocentsspärren.
 VALKRETS_SPARR = cfg.VALKRETS_SPARR * 100
 
+# Hur mycket av sitt kommunvalsstöd ett lokalt parti behåller på andra nivåer.
+# Skattat från samtliga kommuner med minst tre procent ÖVRIGA i kommunvalet
+# 2018 och 2022. Väljare som röstar lokalt i kommunvalet röstar oftast på ett
+# riksdagsparti när de väljer riksdag, vilket gör tappet dramatiskt. Används i
+# metodbeskrivningen på sidan.
+NIVAKVOT = {
+    "kommun": 1.00,
+    "region": 0.66,
+    "riksdagsvalkrets": 0.19,
+}
 
-def las() -> pd.DataFrame:
-    """Läser tabellen över lokala partier.
 
-    Tomma värden i stod och forra_valet tolkas som saknade, inte som nollor.
+def las_matningar() -> pd.DataFrame:
+    """Läser lokala mätningar med samtliga publicerade partisiffror.
+
+    En lokal mätning mäter hela partifältet i sitt område, inte bara det lokala
+    partiet. Alla partier som redovisats i mätningen ska därför vägas mot
+    modellens skattning, inte bara det namngivna lokala partiet.
+
+    Partier som inte publicerats lämnas tomma i CSV-filen och behåller
+    modellens egen skattning.
     """
-    if not FIL.exists():
-        return pd.DataFrame(columns=["parti", "niva", "omrade_kod", "omrade_namn",
-                                     "stod", "forra_valet", "kalla", "datum",
-                                     "kommentar"])
+    fil = ROT / "data" / "lokala_matningar.csv"
+    if not fil.exists():
+        return pd.DataFrame()
+
     rader = []
-    with open(FIL, encoding="utf-8") as f:
+    with open(fil, encoding="utf-8") as f:
         for rad in csv.DictReader(f):
-            parti = (rad.get("parti") or "").strip()
             niva = (rad.get("niva") or "").strip()
-            if not parti or not niva:
+            kod = (rad.get("omrade_kod") or "").strip()
+            if not niva or not kod:
                 continue
 
             def tal(nyckel):
@@ -56,91 +72,71 @@ def las() -> pd.DataFrame:
                 except ValueError:
                     return np.nan
 
-            rader.append({
-                "parti": parti,
+            post = {
+                "id": (rad.get("id") or "").strip(),
                 "niva": niva,
-                "omrade_kod": (rad.get("omrade_kod") or "").strip(),
+                "omrade_kod": kod,
                 "omrade_namn": (rad.get("omrade_namn") or "").strip(),
-                "stod": tal("stod"),
-                "forra_valet": tal("forra_valet"),
-                "kalla": (rad.get("kalla") or "").strip(),
+                "institut": (rad.get("institut") or "").strip(),
+                "uppdragsgivare": (rad.get("uppdragsgivare") or "").strip(),
+                "urval": int(tal("urval")) if np.isfinite(tal("urval")) else None,
                 "datum": (rad.get("datum") or "").strip(),
+                "lokalt_parti": (rad.get("lokalt_parti") or "").strip() or None,
+                "lokalt_stod": tal("lokalt_stod"),
+                "kalla": (rad.get("kalla") or "").strip(),
                 "kommentar": (rad.get("kommentar") or "").strip(),
-            })
+            }
+            for parti in cfg.PARTIER:
+                post[parti] = tal(parti)
+            rader.append(post)
+
     return pd.DataFrame(rader)
 
 
-# Hur mycket av sitt kommunvalsstöd ett lokalt parti behåller på andra nivåer.
-# Skattat från samtliga kommuner med minst tre procent ÖVRIGA i kommunvalet
-# 2018 och 2022. Väljare som röstar lokalt i kommunvalet röstar oftast på ett
-# riksdagsparti när de väljer riksdag, vilket gör tappet dramatiskt.
-NIVAKVOT = {
-    "kommun": 1.00,
-    "region": 0.66,      # Regionvalet ligger nära kommunvalet.
-    "riksdagsvalkrets": 0.19,  # Medianen är 0,156 och medelvärdet 0,194.
-}
+def matning_for_omrade(niva: str, omrade_kod: str) -> dict | None:
+    """Den lokala mätning som gäller ett område, om den är fullständig.
 
+    En mätning används bara om samtliga riksdagspartier har en publicerad
+    siffra. En ofullständig mätning kan inte vägas in konsekvent: att justera
+    några partier mot mätningen och låta resten stå kvar på modellens skattning
+    ger en fördelning som varken speglar mätningen eller modellen, och
+    normaliseringen flyttar då felet till de partier som inte mättes.
 
-def _kallrad(tabell: pd.DataFrame, parti: str):
-    """Raden med den faktiska mätningen för ett parti, om någon finns."""
-    egna = tabell[(tabell["parti"] == parti) & tabell["stod"].notna()]
-    return egna.iloc[0] if not egna.empty else None
-
-
-def _urval(kalltext: str | None) -> int | None:
-    """Plockar ut antalet svarande ur källtexten, t.ex. "(1000 svarande)"."""
-    if not kalltext:
-        return None
-    m = re.search(r"(\d[\d\s]{2,6})\s*(?:svarande|intervjuer|personer)",
-                  str(kalltext), re.IGNORECASE)
-    if not m:
-        return None
-    try:
-        return int(m.group(1).replace(" ", ""))
-    except ValueError:
-        return None
-
-
-def _skala_mellan_nivaer(tabell: pd.DataFrame, parti: str, niva: str,
-                         ovriga_kvot: float | None = None) -> float | None:
-    """Skattar stödet på en nivå utifrån en mätning på en annan.
-
-    Om partiet har en mätning på nivån används den. Annars skalas stödet från
-    den nivå som har en mätning, i första hand med partiets eget förhållande
-    mellan nivåerna i förra valet, i andra hand med den empiriska nivåkvoten.
-
-    Skalningen till riksdagsvalet är den mest osäkra: ett lokalt parti behåller
-    typiskt bara en femtedel av sitt kommunvalsstöd när samma väljare röstar
-    till riksdagen.
+    Mätningar som saknar partier läses in ändå, med anvands satt till False, så
+    att de kan redovisas på sidan tillsammans med skälet.
     """
-    egna = tabell[tabell["parti"] == parti]
-    mal = egna[egna["niva"] == niva]
-    if not mal.empty and np.isfinite(mal.iloc[0]["stod"]):
-        return float(mal.iloc[0]["stod"])
-
-    # Hitta en nivå med mätning att skala från.
-    kalla = egna[egna["stod"].notna() & np.isfinite(egna["stod"])]
-    if kalla.empty:
+    tabell = las_matningar()
+    if tabell.empty:
         return None
-    kallrad = kalla.iloc[0]
 
-    forra_kalla = kallrad["forra_valet"]
-    forra_mal = mal.iloc[0]["forra_valet"] if not mal.empty else np.nan
+    traff = tabell[(tabell["niva"] == niva) &
+                   (tabell["omrade_kod"].astype(str).str.upper()
+                    == str(omrade_kod).upper())]
+    if traff.empty:
+        return None
 
-    if np.isfinite(forra_kalla) and np.isfinite(forra_mal) and forra_kalla > 0:
-        # Partiet växer eller krymper proportionellt på båda nivåerna.
-        return float(kallrad["stod"] * forra_mal / forra_kalla)
+    rad = traff.iloc[0]
+    partier = {p: float(rad[p]) for p in cfg.PARTIER if np.isfinite(rad[p])}
+    saknade = [p for p in cfg.PARTIER if p not in partier]
+    fullstandig = not saknade
 
-    if ovriga_kvot is not None and np.isfinite(ovriga_kvot):
-        return float(kallrad["stod"] * ovriga_kvot)
-
-    # Fall tillbaka på den empiriska nivåkvoten, relativt källnivån.
-    kvot_mal = NIVAKVOT.get(niva)
-    kvot_kalla = NIVAKVOT.get(kallrad["niva"])
-    if kvot_mal is not None and kvot_kalla:
-        return float(kallrad["stod"] * kvot_mal / kvot_kalla)
-
-    return None
+    return {
+        "id": rad["id"],
+        "institut": rad["institut"],
+        "uppdragsgivare": rad["uppdragsgivare"],
+        "urval": rad["urval"],
+        "datum": rad["datum"],
+        "vikt": vikt_for_matning(rad["datum"], rad["urval"]),
+        "partier": partier,
+        "saknade": saknade,
+        "fullstandig": fullstandig,
+        "anvands": fullstandig,
+        "lokalt_parti": rad["lokalt_parti"],
+        "lokalt_stod": (float(rad["lokalt_stod"])
+                        if np.isfinite(rad["lokalt_stod"]) else None),
+        "kalla": rad["kalla"],
+        "kommentar": rad["kommentar"],
+    }
 
 
 def vikt_for_matning(datum_text: str | None, urval: int | None = None) -> float:
@@ -180,118 +176,62 @@ def vikt_for_matning(datum_text: str | None, urval: int | None = None) -> float:
     return max(0.0, min(1.0, vikt))
 
 
-def vagt_stod(matt_varde: float, modellens_skattning: float,
-              vikt: float) -> float:
-    """Väger samman en lokal mätning med modellens egen skattning."""
-    v = max(0.0, min(1.0, vikt))
-    return v * matt_varde + (1.0 - v) * modellens_skattning
+def blanda_in_matning(stod: dict[str, float], niva: str,
+                      omrade_kod: str) -> tuple[dict[str, float], dict | None]:
+    """Väger in en lokal mätning i ett områdes prognos.
 
+    Metoden följer samma princip som SCB:s partisympatiundersökning i
+    regionmodellen: mätningen och modellens skattning vägs samman partivis och
+    resultatet normaliseras, i stället för att enskilda partier skrivs över.
+    Skillnaden är vikten, som är betydligt högre här eftersom en lokal mätning
+    gäller exakt det område den används på, medan partisympatiundersökningen är
+    indelad i tio grova landsdelar.
 
-def dela_upp_ovriga(stod_ovriga: float, parti_stod: float | None) -> tuple[float, float]:
-    """Delar ÖVRIGA i det namngivna partiet och resterande lokala partier.
-
-    Returnerar partiets stöd och det som blir kvar för övriga. Om partiet mäts
-    högre än den ursprungliga ÖVRIGA-posten växer totalen, vilket är rimligt:
-    partiet tar då röster från riksdagspartierna, inte bara från andra lokala.
+    Mätningen används bara om den är fullständig, se matning_for_omrade.
+    Returnerar det justerade stödet och mätningen, eller ursprungligt stöd och
+    None om ingen användbar mätning finns.
     """
-    if parti_stod is None or not np.isfinite(parti_stod):
-        return 0.0, stod_ovriga
-    rest = max(0.0, stod_ovriga - parti_stod)
-    return parti_stod, rest
+    matning = matning_for_omrade(niva, omrade_kod)
+    if matning is None or not matning["anvands"]:
+        return stod, matning
 
+    vikt = matning["vikt"]
+    ut = dict(stod)
 
-def for_omrade(niva: str, omrade_kod: str,
-               ovriga_kvot: float | None = None) -> dict | None:
-    """Returnerar det lokala partiet för ett område, om något finns.
+    # Riksdagspartierna vägs mot sina uppmätta värden.
+    for parti, matt in matning["partier"].items():
+        if parti in ut:
+            ut[parti] = (1.0 - vikt) * ut[parti] + vikt * matt
 
-    Resultatet innehåller partiets namn, skattat stöd, källa och om stödet är
-    mätt eller skalat från en annan nivå.
-    """
-    tabell = las()
-    if tabell.empty:
-        return None
+    # Det lokala partiet vägs mot ÖVRIGA, som är modellens skattning för det.
+    lokalt = matning["lokalt_parti"]
+    if lokalt and matning["lokalt_stod"] is not None:
+        bas = ut.get("ÖVRIGA", 0.0)
+        vagt = (1.0 - vikt) * bas + vikt * matning["lokalt_stod"]
+        ut[lokalt] = vagt
+        ut["ÖVRIGA"] = max(0.0, bas - vagt)
 
-    trafffilter = ((tabell["niva"] == niva) &
-                   (tabell["omrade_kod"].str.upper() == str(omrade_kod).upper()))
-    rader = tabell[trafffilter]
-    if rader.empty:
-        return None
+    # Normalisera till hundra procent.
+    summa = sum(v for v in ut.values() if v > 0)
+    if summa > 0:
+        ut = {k: max(0.0, v) / summa * 100.0 for k, v in ut.items()}
 
-    rad = rader.iloc[0]
-    parti = rad["parti"]
-    matt = bool(np.isfinite(rad["stod"]))
-    stod = (float(rad["stod"]) if matt
-            else _skala_mellan_nivaer(tabell, parti, niva, ovriga_kvot))
-    if stod is None:
-        return None
-
-    # Vikten gäller bara en mätt siffra. Ett skalat värde är redan härlett ur
-    # en mätning på annan nivå och ärver den mätningens vikt.
-    kallrad = rad if matt else _kallrad(tabell, parti)
-    vikt = vikt_for_matning(
-        (kallrad["datum"] if kallrad is not None else None),
-        _urval(kallrad["kalla"] if kallrad is not None else None))
-
-    return {
-        "parti": parti,
-        "stod": stod,
-        "matt": matt,
-        "vikt": vikt,
-        "kalla": rad["kalla"] or None,
-        "datum": rad["datum"] or None,
-        "forra_valet": (float(rad["forra_valet"])
-                        if np.isfinite(rad["forra_valet"]) else None),
-        "kommentar": rad["kommentar"] or None,
-    }
-
-
-def riksdagschans(valkrets: str, stod_i_valkrets: float,
-                  osakerhet: float = 2.5) -> dict | None:
-    """Sannolikheten att ett lokalt parti når riksdagen via valkretsspärren.
-
-    Ett parti som får tolv procent i en valkrets tar mandat där även utan att
-    klara fyraprocentsspärren nationellt.
-
-    Sannolikheten skattas med en normalfördelning kring det härledda stödet.
-    Osäkerheten är satt brett eftersom kedjan är svag: det finns inga mätningar
-    av riksdagsvalet i en enskild valkrets, så stödet härleds från en
-    kommunmätning via en nivåkvot som varierar kraftigt mellan kommuner. Talet
-    ska läsas som en storleksordning, inte som en precis sannolikhet.
-    """
-    from math import erf, sqrt
-
-    if stod_i_valkrets is None or not np.isfinite(stod_i_valkrets):
-        return None
-
-    z = (stod_i_valkrets - VALKRETS_SPARR) / osakerhet
-    sannolikhet = 0.5 * (1.0 + erf(z / sqrt(2.0)))
-
-    return {
-        "valkrets": valkrets,
-        "stod": stod_i_valkrets,
-        "sparr": VALKRETS_SPARR,
-        "osakerhet": osakerhet,
-        "sannolikhet": float(sannolikhet),
-    }
+    return ut, matning
 
 
 if __name__ == "__main__":
-    tabell = las()
-    print(f"{len(tabell)} rader i data/lokala_partier.csv")
-    if not tabell.empty:
-        print(tabell[["parti", "niva", "omrade_namn", "stod", "forra_valet"]]
-              .to_string(index=False))
-
-    for niva, kod in [("kommun", "1880"), ("region", "18L")]:
-        post = for_omrade(niva, kod)
-        if post:
-            hur = "mätt" if post["matt"] else "skalat från annan nivå"
-            print(f"\n{niva} {kod}: {post['parti']} {post['stod']:.1f} % ({hur})")
-
-    krets = for_omrade("riksdagsvalkrets", "VR22")
-    if krets:
-        chans = riksdagschans("Örebro läns valkrets", krets["stod"])
-        if chans:
-            print(f"\nRiksdagen via valkretsspärren: {krets['stod']:.1f} % mot "
-                  f"{chans['sparr']:.0f} % krävs, sannolikhet "
-                  f"{chans['sannolikhet']*100:.1f} %")
+    tabell = las_matningar()
+    print(f"{len(tabell)} lokala mätningar i data/lokala_matningar.csv\n")
+    for _, rad in tabell.iterrows():
+        m = matning_for_omrade(rad["niva"], rad["omrade_kod"])
+        if not m:
+            continue
+        status = (f"används, vikt {m['vikt']*100:.0f} procent" if m["anvands"]
+                  else f"används inte, saknar {', '.join(m['saknade'])}")
+        print(f"  {m['institut']} för {m['uppdragsgivare']}, "
+              f"{rad['omrade_namn']} ({rad['niva']}): {status}")
+        if m["partier"]:
+            print("    " + "  ".join(f"{p} {v:.1f}"
+                                     for p, v in m["partier"].items()))
+        if m["lokalt_parti"]:
+            print(f"    {m['lokalt_parti']} {m['lokalt_stod']:.1f}")
