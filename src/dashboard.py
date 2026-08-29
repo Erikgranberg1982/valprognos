@@ -224,6 +224,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
                 "m_borg": int(rad.get("mandat_borgerliga", 0)),
                 "m_sd": int(rad.get("mandat_sd_ensam", 0)),
                 "m_ovr": int(rad.get("mandat_utanfor", 0)),
+                "valkretsar": vk_per_kommun.get(str(omrade).zfill(4)),
                 "lage": str(rad.get("lage", "okant")),
                 "lagetext": str(rad.get("lage_text", "")),
                 "lagebesk": str(rad.get("lage_beskrivning", "")),
@@ -267,6 +268,25 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
 
     import lokala_koalitioner
     koalitioner_def = lokala_koalitioner.las()
+
+    # Valkretsarnas prognos, grupperad på kommunkod så att detaljvyn bara
+    # behöver slå upp den kommun som visas.
+    vk_per_kommun = {}
+    if valkretsar is not None and not valkretsar.empty:
+        for kod, grupp in valkretsar.groupby("kommunkod"):
+            poster = []
+            for _, rad in grupp.iterrows():
+                stod, diff = {}, {}
+                for parti in cfg.PARTIER:
+                    varde = rad.get(parti)
+                    if varde is not None and pd.notna(varde):
+                        stod[parti] = round(float(varde), 1)
+                    d = rad.get(f"diff_{parti}")
+                    if d is not None and pd.notna(d):
+                        diff[parti] = round(float(d), 1)
+                poster.append({"namn": str(rad["valkretsnamn"]),
+                               "stod": stod, "diff": diff})
+            vk_per_kommun[str(kod).zfill(4)] = poster
 
     regiondata = paketera(regioner, "region")
     kommundata = paketera(kommuner, "kommun")
@@ -314,7 +334,6 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         for p in partier)
     metod_html = _metod_lokal()
     lokala_matningar_html = _lokala_matningar_html(regioner, kommuner)
-    valkretsar_html = _valkretsar_html(valkretsar)
 
     html = f"""
 <div id="lokalvy" hidden>
@@ -350,7 +369,6 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
 
   {metod_html}
 
-  {valkretsar_html}
 </div>
 """
     kommun_json = json.dumps(kommundata, ensure_ascii=False, separators=(",", ":"))
@@ -575,69 +593,6 @@ eftersom de gäller exakt det område de används på. Vikten halveras på
 {cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar.</div>
 """
 
-
-
-def _valkretsar_html(valkretsar=None) -> str:
-    """Redovisar prognos per valkrets i de valkretsindelade kommunerna.
-
-    Sjutton kommuner är indelade i flera valkretsar, vilket höjer
-    småpartispärren från två till tre procent. Skillnaderna inom en kommun kan
-    vara stora: i Stockholm ligger Moderaterna mellan tio och trettio procent
-    beroende på valkrets.
-
-    Mandaten fördelas på kommunnivå, eftersom utjämningsmandaten gör
-    slutresultatet proportionellt över hela kommunen.
-    """
-    if valkretsar is None or valkretsar.empty:
-        return ""
-
-    rader = []
-    for kommun, grupp in valkretsar.groupby("kommun", sort=True):
-        antal = len(grupp)
-        for i, (_, rad) in enumerate(grupp.iterrows()):
-            celler = []
-            for parti in cfg.PARTIER:
-                varde = rad.get(parti)
-                diff = rad.get(f"diff_{parti}")
-                if varde is None or not pd.notna(varde):
-                    celler.append('<td class="tal dim">–</td>')
-                    continue
-                pil = ""
-                if diff is not None and pd.notna(diff) and abs(diff) >= 0.5:
-                    riktning = "upp" if diff > 0 else "ned"
-                    pil = (f'<span class="vkdiff {riktning}">'
-                           f'{diff:+.1f}</span>')
-                celler.append(f'<td class="tal">{varde:.1f}{pil}</td>')
-
-            kommuncell = (f'<td class="inst" rowspan="{antal}">{kommun}'
-                          f'<div class="matningsmeta">{antal} valkretsar · '
-                          f'3 % spärr</div></td>' if i == 0 else "")
-            rader.append(f'<tr>{kommuncell}'
-                         f'<td>{rad["valkretsnamn"]}</td>{"".join(celler)}</tr>')
-
-    partihuvud = "".join(f'<th class="tal">{p}</th>' for p in cfg.PARTIER)
-
-    return f"""
-<h2 id="valkretsar">Valkretsar</h2>
-<div class="sektionsrubrik">Prognos för kommuner med flera valkretsar</div>
-<div class="tabellwrap"><table>
-  <thead><tr><th>Kommun</th><th>Valkrets</th>{partihuvud}</tr></thead>
-  <tbody>{''.join(rader)}</tbody>
-</table></div>
-<div class="notis">En kommun med fler än 6 000 röstberättigade får delas in i
-flera valkretsar. Det höjer småpartispärren från två till tre procent, vilket
-avgör om små partier får mandat: i valet 2022 fick partier mellan två och tre
-procent mandat i 154 av 158 fall i kommuner med en valkrets, men i noll av åtta
-fall i de valkretsindelade.
-
-Prognosen per valkrets bygger på valkretsens eget resultat 2022 skalat med
-rikstrenden, med förändringen sedan dess utsatt. Skillnaderna inom en kommun
-kan vara stora och döljs av kommunsiffran.
-
-Mandaten fördelas däremot på kommunnivå. Nio tiondelar fördelas visserligen
-inom valkretsarna, men utjämningsmandaten gör slutresultatet proportionellt
-över hela kommunen.</div>
-"""
 
 
 
@@ -1193,6 +1148,11 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .kallcell {{ font-size:12.5px; color:var(--svag); max-width:340px; }}
 .matningsmeta {{ font-size:11.5px; color:var(--svag); font-weight:400;
   margin-top:2px; }}
+.vkblock {{ margin-top:22px; padding-top:20px;
+  border-top:1px solid var(--linje); }}
+.vkblock .tabellwrap {{ border:none; }}
+.vkblock th {{ padding:8px 10px; }}
+.vkblock td {{ padding:8px 10px; }}
 .vkdiff {{ display:block; font-size:10.5px; font-weight:600; }}
 .vkdiff.upp {{ color:var(--gron); }}
 .vkdiff.ned {{ color:var(--korall); }}
@@ -1923,6 +1883,45 @@ const LOKAL = {lokal_json};
         '</div>';
     }}
 
+    /* Valkretsar visas bara för de kommuner som är indelade i flera. Spärren
+       är då tre procent i stället för två, vilket avgör om små partier får
+       mandat. Mandaten fördelas ändå på kommunnivå, se notisen. */
+    let vkhtml = '';
+    if (post.valkretsar && post.valkretsar.length > 1) {{
+      const rubriker = PART.filter(function(p) {{ return p !== 'ÖVRIGA'; }});
+      const huvud = rubriker.map(function(p) {{
+        return '<th class="tal">' + p + '</th>';
+      }}).join('');
+
+      const kroppen = post.valkretsar.map(function(vk) {{
+        const celler = rubriker.map(function(p) {{
+          const v = vk.stod[p];
+          if (v === undefined) return '<td class="tal dim">–</td>';
+          const d = vk.diff[p];
+          let pil = '';
+          if (d !== undefined && Math.abs(d) >= 0.5) {{
+            pil = '<span class="vkdiff ' + (d > 0 ? 'upp' : 'ned') + '">' +
+                  (d > 0 ? '+' : '') + d.toFixed(1) + '</span>';
+          }}
+          return '<td class="tal">' + v.toFixed(1) + pil + '</td>';
+        }}).join('');
+        return '<tr><td class="inst">' + vk.namn + '</td>' + celler + '</tr>';
+      }}).join('');
+
+      vkhtml =
+        '<div class="vkblock">' +
+          '<div class="koalrubrik">Valkretsar</div>' +
+          '<div class="tabellwrap"><table>' +
+            '<thead><tr><th>Valkrets</th>' + huvud + '</tr></thead>' +
+            '<tbody>' + kroppen + '</tbody>' +
+          '</table></div>' +
+          '<p class="koalnot">Kommunen är indelad i ' + post.valkretsar.length +
+          ' valkretsar, vilket höjer småpartispärren från två till tre procent. ' +
+          'Mandaten fördelas ändå proportionellt över hela kommunen genom ' +
+          'utjämningsmandat, så fördelningen ovan görs på kommunnivå.</p>' +
+        '</div>';
+    }}
+
     detalj.innerHTML =
       '<div class="detaljkort">' +
         '<div class="detaljhuvud">' +
@@ -1959,6 +1958,7 @@ const LOKAL = {lokal_json};
           staplar +
         '</div>' +
         koalhtml +
+        vkhtml +
         lokalnotis +
       '</div>';
     detalj.hidden = false;
