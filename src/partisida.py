@@ -70,6 +70,7 @@ def _bygg_partidata(sammanfattning: pd.DataFrame, trend: pd.DataFrame,
                         "u": uppgift,
                         "p": int(k["ord"]) if pd.notna(k["ord"]) else 0,
                         "l": str(k.get("listbeteckning") or ""),
+                        "ln": str(k.get("listnummer") or ""),
                         "m": txt,
                         "niva": niv,
                         "v": varning if varning and varning != "nan" else None,
@@ -195,9 +196,14 @@ gap:13px;margin-top:20px}}
 .vrub{{font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;
 color:var(--korall);margin-bottom:5px}}
 .vk p{{margin:0;font-size:12.5px;color:var(--svag);line-height:1.6}}
+.tbaka{{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+font-weight:600;color:var(--korall);text-decoration:none;margin-bottom:12px;
+padding:5px 11px 5px 8px;border:1px solid var(--kant,rgba(0,0,0,.12));
+border-radius:99px;background:var(--panel);transition:.15s}}
+.tbaka:hover{{background:var(--korall);color:#fff;border-color:var(--korall)}}
 .vk em{{font-style:normal;font-weight:600;color:var(--text)}}
 </style></head><body>
-<header><div class="w"><h1>Partierna i riksdagsvalet 2026</h1>
+<header><div class="w"><a class="tbaka" href="index.html"><span>&#8592;</span> Tillbaka till prognosen</a><h1>Partierna i riksdagsvalet 2026</h1>
 <div class="sub">{dagar} dagar till valdagen · {matningar} mätningar i modellen</div>
 </div></header>
 <div class="w">
@@ -264,7 +270,8 @@ function rita(p){{
   var vk=d.valkretsar.map(function(v){{
     var namn=v.kandidater.map(function(k){{
       var titel=k.n+(k.u?'\\n'+k.u:'')+
-                '\\nPlats '+k.p+' på listan '+k.l+
+                '\\nValsedel '+(k.ln?k.ln+' · ':'')+k.l+
+                '\\nPlats '+k.p+' på valsedeln'+
                 (k.m?'\\n'+k.m:'')+(k.v?'\\n'+k.v:'');
       return '<span class="kb" title="'+titel.replace(/"/g,'&quot;')+'">'+
              '<span class="kn">'+k.p+'</span>'+k.n+

@@ -134,11 +134,17 @@ border-radius:28px;white-space:nowrap}}
 .m.sakert{{background:rgba(125,186,116,.2);color:#3f7a36}}
 .m.medel{{background:var(--panel);color:var(--svag)}}
 .v{{display:block;margin-top:3px;font-size:10.5px;color:var(--korall);cursor:help}}
+.tbaka{{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+font-weight:600;color:var(--korall);text-decoration:none;margin-bottom:12px;
+padding:5px 11px 5px 8px;border:1px solid var(--kant,rgba(0,0,0,.12));
+border-radius:99px;background:var(--panel);transition:.15s}}
+.tbaka:hover{{background:var(--korall);color:#fff;border-color:var(--korall)}}
 .rakn{{color:var(--svag);font-size:13px;margin:10px 0}}
 .not{{margin-top:26px;padding:14px 17px;background:var(--panel);
 border-left:3px solid var(--korall);border-radius:0 8px 8px 0;
 font-size:12.5px;color:var(--svag);max-width:860px;line-height:1.65}}
 </style></head><body><div class="w">
+<a class="tbaka" href="index.html"><span>&#8592;</span> Tillbaka till prognosen</a>
 <h1>Riksdagen 2026</h1>
 <div class="sub">{antal} prognosticerade ledamöter i {valkretsar} valkretsar</div>
 <div class="styr">

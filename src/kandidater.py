@@ -114,6 +114,11 @@ def per_omrade(niva: str) -> dict:
         # rader. Valsedelsuppgiften är den text partiet tryckt på valsedeln och
         # innehåller ålder, ort och titel, exempelvis "44, Nacka,
         # Riksdagsledamot". Saknas den byggs motsvarande text av ålder och ort.
+        # Valsedelns nummer och beteckning är samma för hela listan, så de
+        # lagras en gång per parti i stället för per kandidat.
+        listnummer = str(grupp["listnummer"].iloc[0] or "").strip()
+        listnamn = str(grupp["listbeteckning"].iloc[0] or "").strip()
+
         namn = []
         for _, rad in grupp.iterrows():
             uppgift = str(rad.get("valsedelsuppgift") or "").strip()
@@ -126,7 +131,15 @@ def per_omrade(niva: str) -> dict:
                 if ort and ort != "nan":
                     delar.append(ort)
                 uppgift = ", ".join(delar)
-            namn.append(f"{rad['namn']}|{uppgift}".rstrip("|"))
+            # "Namn|uppgift|listplats". Listplatsen är kandidatens ordning på
+            # valsedeln, som kan skilja sig från platsen partiet får i
+            # fullmäktige när kandidater längre upp inte tar sitt mandat.
+            plats = rad.get("ordning")
+            try:
+                plats = str(int(float(plats)))
+            except (TypeError, ValueError):
+                plats = ""
+            namn.append(f"{rad['namn']}|{uppgift}|{plats}".rstrip("|"))
 
         try:
             mandat = int(float(grupp["prognosmandat_parti"].iloc[0]))
@@ -137,6 +150,8 @@ def per_omrade(niva: str) -> dict:
             "p": str(parti),
             "m": mandat,
             "k": namn,
+            "ln": listnummer,
+            "lb": listnamn,
             "niva": METODNIVA.get(metod, "osakert"),
             "v": str(varning.iloc[0]) if len(varning) else None,
         })

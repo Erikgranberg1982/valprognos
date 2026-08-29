@@ -1448,6 +1448,8 @@ footer strong {{ color:var(--text); }}
   <button class="nivaknapp" data-niva="kommun">Kommunval</button>
 </div>
 
+<div id="riksdagsvy">
+
 <div class="fordjupning">
   <a class="fkort" href="partier_2026.html">
     <div class="ftitel">Parti för parti {_pil()}</div>
@@ -1458,9 +1460,6 @@ footer strong {{ color:var(--text); }}
     <div class="ftext">Samtliga 346 prognosticerade riksdagsledamöter</div>
   </a>
 </div>
-
-<div id="riksdagsvy">
-
 <h2>Prognos</h2>
 <div class="sektionsrubrik">Så skulle riksdagen se ut</div>
 {kammare}
@@ -2241,10 +2240,10 @@ const LOKAL = {lokal_json};
   }}
 
   function kandidatnamn(text) {{
-    /* Lagrade som "Namn|valsedelsuppgift", där uppgiften är den text partiet
-       tryckt på valsedeln: ålder, ort och titel. */
+    /* Lagrade som "Namn|valsedelsuppgift|listplats". Uppgiften är den text
+       partiet tryckt på valsedeln: ålder, ort och titel. */
     const delar = String(text).split('|');
-    return {{ namn: delar[0], uppgift: delar[1] || '' }};
+    return {{ namn: delar[0], uppgift: delar[1] || '', plats: delar[2] || '' }};
   }}
 
   function ritaKandidater(post) {{
@@ -2286,8 +2285,16 @@ const LOKAL = {lokal_json};
            trettio mandat inte blir en trettio rader lång lista. */
         const brickor = p.k.slice(0, p.m).map(function(text, i) {{
           const k = kandidatnamn(text);
+          /* Listplatsen är kandidatens ordning på valsedeln. Den kan ligga
+             högre än mandatets nummer när någon längre upp inte tar sin
+             plats, så båda visas. */
+          const valsedel = p.ln
+            ? '\\nValsedel ' + p.ln + (p.lb ? ' · ' + p.lb : '')
+            : '';
           const titel = k.namn + (k.uppgift ? '\\n' + k.uppgift : '') +
-                        '\\nPlats ' + (i + 1) + ' av ' + p.m + ' för ' + p.p;
+                        valsedel +
+                        (k.plats ? '\\nPlats ' + k.plats + ' på valsedeln' : '') +
+                        '\\nTar mandat ' + (i + 1) + ' av ' + p.m + ' för ' + p.p;
           return '<span class="kandbricka" title="' +
                  titel.replace(/"/g, '&quot;') + '">' +
                  '<span class="kandnr">' + (i + 1) + '</span>' + k.namn +
