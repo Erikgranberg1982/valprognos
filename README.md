@@ -14,6 +14,8 @@ python3 prognos.py --niva region        # regionvalsprognos
 python3 prognos.py --niva kommun        # kommunvalsprognos
 python3 prognos.py --niva region --omrade Skåne
 python3 prognos.py --hamta              # tvinga ny hämtning från Wikipedia
+python3 prognos.py --kandidater         # hämta vallistor och skriv kandidatprognoser
+python3 prognos.py --kandidater kommun --omrade Örebro
 python3 prognos.py --backtest           # utvärdera mot valet 2022
 python3 prognos.py --korrigera          # historisk valdagskorrigering
 ```
@@ -21,6 +23,22 @@ python3 prognos.py --korrigera          # historisk valdagskorrigering
 Resultatet skrivs till terminalen och till `output/prognos.html`.
 
 Beroenden: `pandas`, `numpy`, `requests`, `beautifulsoup4`, `lxml`.
+
+## Kandidat- och vallisteprognos
+
+`--kandidater` hämtar Valmyndighetens rådatafil med kandidaturer inför valet
+2026, cachelagrar den i `data/valmyndigheten/` och skriver fyra CSV-filer:
+
+- `output/vallistor_2026.csv` – alla namnvalsedlar med normaliserade listnamn.
+- `output/kandidatprognos_riksdag.csv` – 349 prognosticerade riksdagsledamöter.
+- `output/kandidatprognos_region.csv` – prognosticerade regionledamöter.
+- `output/kandidatprognos_kommun.csv` – prognosticerade kommunledamöter.
+
+Kandidaterna tas i listordning från giltiga kandidaturer. Om ett parti har
+flera namnvalsedlar i samma valområde fördelas partiets prognosmandat mellan
+listorna med samma jämkade uddatalsmetod som övriga modellen, viktat efter
+antalet tryckta valsedlar i Valmyndighetens fil. Personröster och faktisk
+röstfördelning mellan flera listor ingår inte.
 
 ## Dashboarden
 

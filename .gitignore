@@ -5,6 +5,7 @@
 .DS_Store
 __pycache__/
 data/scb/
+data/valmyndigheten/
 data/wikipedia_cache_*.html
 output/
 

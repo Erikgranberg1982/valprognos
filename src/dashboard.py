@@ -183,7 +183,8 @@ def _kammare(mandat: dict[str, int], vansterblock: int) -> str:
 
 
 def _lokal_sektion(regioner: pd.DataFrame | None,
-                   kommuner: pd.DataFrame | None) -> tuple[str, str, str]:
+                   kommuner: pd.DataFrame | None,
+                   valkretsar: pd.DataFrame | None = None) -> tuple[str, str, str]:
     """Bygger data och tabellsektion för region- och kommunval.
 
     Returnerar tre delar: sektionens HTML, JSON med regiondata och sammanfattning
@@ -313,7 +314,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         for p in partier)
     metod_html = _metod_lokal()
     lokala_matningar_html = _lokala_matningar_html(regioner, kommuner)
-    valkretsar_html = _valkretsar_html()
+    valkretsar_html = _valkretsar_html(valkretsar)
 
     html = f"""
 <div id="lokalvy" hidden>
@@ -576,46 +577,49 @@ eftersom de gäller exakt det område de används på. Vikten halveras på
 
 
 
-def _valkretsar_html() -> str:
-    """Redovisar valkretsindelningen och resultatet per valkrets 2022.
+def _valkretsar_html(valkretsar=None) -> str:
+    """Redovisar prognos per valkrets i de valkretsindelade kommunerna.
 
     Sjutton kommuner är indelade i flera valkretsar, vilket höjer
-    småpartispärren från två till tre procent. Skillnaden avgör om små partier
-    får mandat, så indelningen förtjänar en egen redovisning.
+    småpartispärren från två till tre procent. Skillnaderna inom en kommun kan
+    vara stora: i Stockholm ligger Moderaterna mellan tio och trettio procent
+    beroende på valkrets.
 
-    Resultatet per valkrets är utfallet 2022 från Valmyndighetens rådata.
-    Prognosen görs på kommunnivå, eftersom mandaten fördelas proportionellt
-    över hela kommunen genom utjämningsmandat.
+    Mandaten fördelas på kommunnivå, eftersom utjämningsmandaten gör
+    slutresultatet proportionellt över hela kommunen.
     """
-    fil = ROT / "data" / "kommun_valkretsresultat.csv"
-    if not fil.exists():
-        return ""
-    try:
-        tabell = pd.read_csv(fil, dtype={"kommunkod": str})
-    except Exception:
-        return ""
-    if tabell.empty:
+    if valkretsar is None or valkretsar.empty:
         return ""
 
     rader = []
-    for kommun, grupp in tabell.groupby("kommun", sort=True):
+    for kommun, grupp in valkretsar.groupby("kommun", sort=True):
         antal = len(grupp)
         for i, (_, rad) in enumerate(grupp.iterrows()):
-            celler = "".join(
-                f'<td class="tal">{rad[p]:.1f}</td>' if pd.notna(rad[p])
-                else '<td class="tal dim">–</td>' for p in cfg.PARTIER
-            )
+            celler = []
+            for parti in cfg.PARTIER:
+                varde = rad.get(parti)
+                diff = rad.get(f"diff_{parti}")
+                if varde is None or not pd.notna(varde):
+                    celler.append('<td class="tal dim">–</td>')
+                    continue
+                pil = ""
+                if diff is not None and pd.notna(diff) and abs(diff) >= 0.5:
+                    riktning = "upp" if diff > 0 else "ned"
+                    pil = (f'<span class="vkdiff {riktning}">'
+                           f'{diff:+.1f}</span>')
+                celler.append(f'<td class="tal">{varde:.1f}{pil}</td>')
+
             kommuncell = (f'<td class="inst" rowspan="{antal}">{kommun}'
                           f'<div class="matningsmeta">{antal} valkretsar · '
                           f'3 % spärr</div></td>' if i == 0 else "")
             rader.append(f'<tr>{kommuncell}'
-                         f'<td>{rad["valkretsnamn"]}</td>{celler}</tr>')
+                         f'<td>{rad["valkretsnamn"]}</td>{"".join(celler)}</tr>')
 
     partihuvud = "".join(f'<th class="tal">{p}</th>' for p in cfg.PARTIER)
 
     return f"""
 <h2 id="valkretsar">Valkretsar</h2>
-<div class="sektionsrubrik">Kommuner med flera valkretsar</div>
+<div class="sektionsrubrik">Prognos för kommuner med flera valkretsar</div>
 <div class="tabellwrap"><table>
   <thead><tr><th>Kommun</th><th>Valkrets</th>{partihuvud}</tr></thead>
   <tbody>{''.join(rader)}</tbody>
@@ -626,10 +630,13 @@ avgör om små partier får mandat: i valet 2022 fick partier mellan två och tr
 procent mandat i 154 av 158 fall i kommuner med en valkrets, men i noll av åtta
 fall i de valkretsindelade.
 
-Nio tiondelar av mandaten fördelas inom valkretsarna och resten är
-utjämningsmandat som gör fördelningen proportionell över hela kommunen.
-Prognosen räknar därför på kommunnivå, med rätt spärr för varje kommun.
-Siffrorna nedan är utfallet 2022 per valkrets, från Valmyndighetens rådata.</div>
+Prognosen per valkrets bygger på valkretsens eget resultat 2022 skalat med
+rikstrenden, med förändringen sedan dess utsatt. Skillnaderna inom en kommun
+kan vara stora och döljs av kommunsiffran.
+
+Mandaten fördelas däremot på kommunnivå. Nio tiondelar fördelas visserligen
+inom valkretsarna, men utjämningsmandaten gör slutresultatet proportionellt
+över hela kommunen.</div>
 """
 
 
@@ -638,7 +645,8 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
          trend: pd.DataFrame, husfaktorer: pd.DataFrame,
          matningar: pd.DataFrame, meta: dict,
          regioner: pd.DataFrame | None = None,
-         kommuner: pd.DataFrame | None = None) -> str:
+         kommuner: pd.DataFrame | None = None,
+         valkretsar: pd.DataFrame | None = None) -> str:
 
     # --- Partirader
     partirader = []
@@ -796,7 +804,8 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
     alla_json = json.dumps(alla, ensure_ascii=False)
     partier_json = json.dumps(cfg.PARTIER)
     partifarg_json = json.dumps(cfg.PARTIFARG)
-    lokal_html, lokal_json, kommun_json = _lokal_sektion(regioner, kommuner)
+    lokal_html, lokal_json, kommun_json = _lokal_sektion(
+        regioner, kommuner, valkretsar)
     logo_farg = _logotyp("lysio-logo-farg.png")
     logo_vit = _logotyp("lysio-logo-vit.png")
     partier_lokal_json = json.dumps(list(cfg.PARTIER) + ["ÖVRIGA"])
@@ -1184,6 +1193,9 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .kallcell {{ font-size:12.5px; color:var(--svag); max-width:340px; }}
 .matningsmeta {{ font-size:11.5px; color:var(--svag); font-weight:400;
   margin-top:2px; }}
+.vkdiff {{ display:block; font-size:10.5px; font-weight:600; }}
+.vkdiff.upp {{ color:var(--gron); }}
+.vkdiff.ned {{ color:var(--korall); }}
 .skalrad {{ font-size:11.5px; color:var(--korall-mork); font-weight:400;
   margin-top:5px; max-width:330px; line-height:1.5; }}
 .metodkort {{ background:var(--kortbg); border:1px solid var(--linje);

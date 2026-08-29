@@ -329,6 +329,12 @@ def main() -> None:
                     help="Vilket val som ska prognosticeras (standard: riksdag)")
     ap.add_argument("--omrade", metavar="NAMN",
                     help="Visa bara ett område, t.ex. --omrade Skåne")
+    ap.add_argument("--kandidater", nargs="?", const="alla",
+                    choices=["alla", "riksdag", "region", "kommun"],
+                    help=("Hämta vallistor och skriv kandidatprognos. "
+                          "Utan nivå skrivs alla tre valen."))
+    ap.add_argument("--tvinga-vallistor", action="store_true",
+                    help="Tvinga ny hämtning av kandidaturer från Valmyndigheten")
     args = ap.parse_args()
 
     if args.backtest:
@@ -349,6 +355,14 @@ def main() -> None:
     korrigera = True if args.korrigera else None
     res = kor_prognos(df, referensdatum, valdag, korrigera=korrigera)
 
+    if args.kandidater:
+        import vallistor
+        vald_niva = None if args.kandidater == "alla" else args.kandidater
+        utfiler = vallistor.skriv_kandidatprognoser(
+            res, niva=vald_niva, omrade=args.omrade,
+            tvinga_vallistor=args.tvinga_vallistor)
+        vallistor.skriv_terminal(utfiler)
+
     if args.niva in ("region", "kommun"):
         kor_lokal_prognos(res, args.niva, args.omrade)
         return
@@ -358,6 +372,11 @@ def main() -> None:
     if not args.ingen_html:
         trend = modell.trendserie(res["justerad"])
         matningar = bygg_matningstabell(df, res, referensdatum)
+        try:
+            import kommunmodell as _km
+            valkretsar = _km.prognos_per_valkrets(res["snitt"])
+        except Exception:
+            valkretsar = None
         regioner, kommuner = bygg_lokala_prognoser(res)
         meta = {
             "dagar_kvar": res["dagar_kvar"],
@@ -370,7 +389,7 @@ def main() -> None:
         html, kommun_json = dashboard.bygg(
             res["sammanfattning"], res["block"], res["regeringar"],
             trend, res["husfaktorer"], matningar, meta,
-            regioner=regioner, kommuner=kommuner)
+            regioner=regioner, kommuner=kommuner, valkretsar=valkretsar)
         ut = dashboard.spara(html, kommun_json)
         print(f"Dashboard sparad: {ut}\n")
 

@@ -288,6 +288,69 @@ def fordela_kommunmandat(stod: dict[str, float], platser: int,
     return mandat
 
 
+def _valkretsresultat() -> pd.DataFrame:
+    """Valkretsarnas resultat 2022, från data/kommun_valkretsresultat.csv."""
+    from pathlib import Path
+    fil = Path(__file__).resolve().parent.parent / "data" / "kommun_valkretsresultat.csv"
+    if not fil.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(fil, dtype={"kommunkod": str})
+    except Exception:
+        return pd.DataFrame()
+
+
+def prognos_per_valkrets(riksprognos: pd.Series) -> pd.DataFrame:
+    """Prognos per valkrets i de kommuner som är valkretsindelade.
+
+    Samma metod som för kommunerna: valkretsens eget resultat 2022 skalat med
+    rikstrenden. Skillnaderna mellan valkretsar inom en kommun är ofta stora,
+    i Stockholm ligger Moderaterna mellan elva och trettio procent beroende på
+    valkrets, så en prognos per valkrets säger något som kommunsiffran döljer.
+
+    Mandaten fördelas däremot inte här. Nio tiondelar av mandaten fördelas visserligen
+    inom valkretsarna, men utjämningsmandaten gör slutresultatet proportionellt
+    över hela kommunen, så mandatfördelningen görs på kommunnivå.
+    """
+    resultat = _valkretsresultat()
+    if resultat.empty:
+        return pd.DataFrame()
+
+    trend = regionmodell._rikstrend(riksprognos)
+
+    rader = []
+    for _, rad in resultat.iterrows():
+        post = {
+            "kommunkod": str(rad["kommunkod"]).zfill(4),
+            "kommun": rad["kommun"],
+            "valkretskod": rad["valkretskod"],
+            "valkretsnamn": rad["valkretsnamn"],
+        }
+        for parti in cfg.PARTIER:
+            bas = rad.get(parti)
+            if bas is None or not np.isfinite(bas):
+                post[parti] = np.nan
+                post[f"forra_{parti}"] = np.nan
+                continue
+            post[parti] = max(0.05, float(bas) * trend.get(parti, 1.0))
+            post[f"forra_{parti}"] = float(bas)
+
+        # Normalisera riksdagspartierna till samma andel som 2022, så att
+        # övriga partier behåller sitt utrymme i valkretsen.
+        gamla = sum(post[f"forra_{p}"] for p in cfg.PARTIER
+                    if np.isfinite(post.get(f"forra_{p}", np.nan)))
+        nya = sum(post[p] for p in cfg.PARTIER
+                  if np.isfinite(post.get(p, np.nan)))
+        if nya > 0 and gamla > 0:
+            for parti in cfg.PARTIER:
+                if np.isfinite(post.get(parti, np.nan)):
+                    post[parti] = post[parti] / nya * gamla
+                    post[f"diff_{parti}"] = post[parti] - post[f"forra_{parti}"]
+        rader.append(post)
+
+    return pd.DataFrame(rader)
+
+
 def sammanfatta(prognos: pd.DataFrame, storlekar: dict[str, int] | None = None) -> pd.DataFrame:
     """Fördelar mandat och sammanfattar styret per kommun.
 
