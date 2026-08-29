@@ -447,6 +447,67 @@ def _riksdagsmandat_2022_per_valkrets() -> dict[tuple[str, str], int]:
     return ut
 
 
+
+# Valkretsnamn i Riksdagens register till Valmyndighetens tvåsiffriga koder.
+_VALKRETSKOD_FOR_NAMN: dict[str, str] | None = None
+
+
+def _valkretskoder() -> dict[str, str]:
+    """Kopplar valkretsens namn till dess kod, från 2022 års kandidaturfil."""
+    global _VALKRETSKOD_FOR_NAMN
+    if _VALKRETSKOD_FOR_NAMN is not None:
+        return _VALKRETSKOD_FOR_NAMN
+    ut: dict[str, str] = {}
+    try:
+        # Valkretsarnas namn och koder hämtas från SCB. Riksdagens register
+        # skriver dem utan ordet valkrets, så båda formerna läggs in.
+        import requests
+        svar = requests.get(
+            "https://api.scb.se/OV0104/v1/doris/sv/ssd/ME/ME0104/ME0104C/ME0104T3",
+            headers={"User-Agent": "svensk-valprediktor/0.1"}, timeout=30)
+        for variabel in svar.json()["variables"]:
+            if variabel["code"] != "Region":
+                continue
+            for kod, namn in zip(variabel["values"], variabel["valueTexts"]):
+                if not kod.startswith("VR") or kod == "VR00":
+                    continue
+                siffror = "".join(c for c in kod if c.isdigit()).zfill(2)
+                for variant in (namn, namn.replace(" valkrets", ""),
+                                namn.replace("s valkrets", "")):
+                    ut.setdefault(_norm(variant), siffror)
+            break
+    except Exception:
+        pass
+    _VALKRETSKOD_FOR_NAMN = ut
+    return ut
+
+
+def _invalda_facit() -> dict[tuple[str, str], str]:
+    """Var varje riksdagsledamot faktiskt valdes in 2022.
+
+    Källa är Riksdagens öppna data, sparad i data/invalda_riksdag_2022.csv.
+    Det är facit och ersätter modellens egen skattning, som gissade fel för
+    partiledare: de står som plats ett på trettio till sextio listor samtidigt,
+    alla registrerade på valområdet Riket, så listorna säger inget om var de
+    faktiskt tog plats.
+    """
+    fil = Path(__file__).resolve().parent.parent / "data" / "invalda_riksdag_2022.csv"
+    if not fil.exists():
+        return {}
+    koder = _valkretskoder()
+    ut: dict[tuple[str, str], str] = {}
+    try:
+        tabell = pd.read_csv(fil, dtype=str)
+    except Exception:
+        return {}
+    for _, rad in tabell.iterrows():
+        parti = str(rad.get("parti") or "").strip()
+        namn = _norm(rad.get("namn"))
+        kod = koder.get(_norm(rad.get("valkrets")), "")
+        if parti and namn and kod:
+            ut[(parti, namn)] = kod
+    return ut
+
 def _invalda_riksdag_2022_proxy() -> dict[tuple[str, str], str]:
     """Proxy för var toppnamn blev invalda 2022.
 
@@ -510,7 +571,11 @@ class VallisteIndex:
         self._lagg_till_deltagandegrund()
         self._listor_by_alias: dict[tuple[str, str, str], pd.DataFrame] = {}
         self._kandidater_by_lista: dict[tuple[str, str, str, str], pd.DataFrame] = {}
+        # Facit från Riksdagens register, kompletterat med modellens egen
+        # skattning för namn som inte finns där, exempelvis ledamöter som
+        # bytt namn eller kandidater som aldrig tog plats.
         self.invalda_riksdag_2022 = _invalda_riksdag_2022_proxy()
+        self.invalda_riksdag_2022.update(_invalda_facit())
         self._bygg_listindex()
         self._bygg_kandidatindex()
 
