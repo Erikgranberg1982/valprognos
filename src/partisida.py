@@ -320,8 +320,18 @@ document.querySelectorAll('.pflik').forEach(function(b){{
     b.classList.add('on'); valt=b.dataset.p; rita(valt);
   }});
 }});
-document.querySelector('.pflik[data-p="{forsta}"]').classList.add('on');
+/* Öppnas sidan med ett parti i adressen, exempelvis #KD, visas det direkt. */
+var fran = decodeURIComponent(location.hash.replace('#', '')).toUpperCase();
+if (fran && D[fran]) valt = fran;
+document.querySelector('.pflik[data-p="' + valt + '"]').classList.add('on');
 rita(valt);
+window.addEventListener('hashchange', function() {{
+  var p = decodeURIComponent(location.hash.replace('#', '')).toUpperCase();
+  if (!D[p]) return;
+  document.querySelectorAll('.pflik').forEach(function(x) {{ x.classList.remove('on'); }});
+  document.querySelector('.pflik[data-p="' + p + '"]').classList.add('on');
+  valt = p; rita(p);
+}});
 var om; window.addEventListener('resize',function(){{
   clearTimeout(om); om=setTimeout(function(){{ritaTrend(valt)}},150);
 }});

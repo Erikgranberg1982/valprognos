@@ -651,8 +651,11 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
                     f'över spärren</span>')
         partirader.append(f"""
         <tr>
-          <td class="parti"><span class="prick" style="background:{farg}"></span>
-              <strong>{p}</strong><span class="fullnamn">{r['namn']}</span></td>
+          <td class="parti"><a class="partilank"
+              href="partier_2026.html#{p}" title="Se {r['namn']} i detalj">
+              <span class="prick" style="background:{farg}"></span>
+              <strong>{p}</strong><span class="fullnamn">{r['namn']}</span>
+              {_pil()}</a></td>
           <td class="stapelcell">{_stapel(r['prognos'], farg)}</td>
           <td class="tal"><strong>{r['prognos']:.1f}%</strong></td>
           <td class="tal">{_diff(r.get('forandring'))}</td>
@@ -954,6 +957,13 @@ th {{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacin
 td {{ padding:11px 12px; border-top:1px solid var(--linje); vertical-align:middle; }}
 tbody tr:hover {{ background:var(--panel); }}
 .parti {{ white-space:nowrap; }}
+/* Partinamnet leder till partisidan med trend, valkretsar och kandidater. */
+.partilank {{ display:inline-flex; align-items:center; gap:2px;
+  text-decoration:none; color:inherit; }}
+.partilank .pil {{ width:13px; height:13px; margin-left:5px; color:var(--korall);
+  opacity:0; transition:opacity .15s, transform .15s; }}
+tr:hover .partilank .pil {{ opacity:1; transform:translateX(2px); }}
+.partilank:hover strong {{ color:var(--korall); }}
 .prick {{ display:inline-block; width:11px; height:11px; border-radius:50%;
   margin-right:9px; vertical-align:-1px; }}
 .fullnamn {{ color:var(--svag); font-size:13px; margin-left:7px; }}
@@ -1060,18 +1070,32 @@ tr.utanfor td {{ opacity:.5; }}
   margin-top:12px; max-width:560px; margin-left:auto; margin-right:auto;
   line-height:1.55; }}
 .legendantal {{ font-weight:700; font-variant-numeric:tabular-nums; color:var(--svag); }}
+/* Egen tooltip, se skriptet. Browserns egen dröjer för länge. */
+.snabbtip {{ position:fixed; z-index:999; pointer-events:none;
+  background:var(--text); color:var(--bg); padding:8px 12px; border-radius:9px;
+  font-size:12.5px; line-height:1.45; max-width:320px;
+  box-shadow:0 6px 20px rgba(0,0,0,.22); }}
+.snabbtip strong {{ display:block; font-size:13.5px; }}
+.snabbtip span {{ display:block; opacity:.82; }}
+.snabbtip[hidden] {{ display:none; }}
 canvas {{ width:100%; height:auto; display:block; }}
 .grafkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:20px; box-shadow:var(--skugga); }}
 .nivaval {{ display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 8px;
   padding-bottom:14px; border-bottom:1px solid var(--linje); align-items:center; }}
-/* Länkar till de fristående sidorna, avskilda från nivåväxlarna. */
-.sidolank {{ display:inline-flex; align-items:center; gap:6px; font-size:13px;
-  font-weight:600; color:var(--korall); text-decoration:none; padding:7px 14px;
-  border-radius:28px; }}
-.sidolank:first-of-type {{ margin-left:auto; }}
-.sidolank:hover {{ background:var(--korall-ljus); }}
-.sidolank .pil {{ width:13px; height:13px; }}
+/* Fördjupningssidorna. De låg tidigare som diskreta textlänkar i
+   nivåraden och upptäcktes inte, så de får egna kort. */
+.fordjupning {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:14px; margin:18px 0 4px; }}
+.fkort {{ display:block; text-decoration:none; color:inherit;
+  background:var(--kortbg); border:1px solid var(--linje); border-radius:14px;
+  padding:16px 20px; transition:border-color .15s, box-shadow .15s; }}
+.fkort:hover {{ border-color:var(--korall); box-shadow:var(--skugga-hog); }}
+.ftitel {{ display:flex; align-items:center; gap:7px; font-size:15px;
+  font-weight:700; color:var(--korall); }}
+.ftext {{ font-size:13px; color:var(--svag); margin-top:2px; }}
+.fkort .pil {{ width:15px; height:15px; transition:transform .15s; }}
+.fkort:hover .pil {{ transform:translateX(3px); }}
 .nivaknapp {{ background:transparent; color:var(--korall); font:inherit;
   font-size:13.5px; font-weight:600; border:1.5px solid var(--korall);
   border-radius:28px; padding:8px 19px; cursor:pointer; transition:all .15s; }}
@@ -1422,8 +1446,17 @@ footer strong {{ color:var(--text); }}
   <button class="nivaknapp aktiv" data-niva="riksdag">Riksdagsval</button>
   <button class="nivaknapp" data-niva="region">Regionval</button>
   <button class="nivaknapp" data-niva="kommun">Kommunval</button>
-  <a class="sidolank" href="partier_2026.html">Parti för parti {_pil()}</a>
-  <a class="sidolank" href="ledamoter_2026.html">Alla ledamöter {_pil()}</a>
+</div>
+
+<div class="fordjupning">
+  <a class="fkort" href="partier_2026.html">
+    <div class="ftitel">Parti för parti {_pil()}</div>
+    <div class="ftext">Trend, mandat och i vilka valkretsar de hamnar</div>
+  </a>
+  <a class="fkort" href="ledamoter_2026.html">
+    <div class="ftitel">Alla ledamöter {_pil()}</div>
+    <div class="ftext">Samtliga 346 prognosticerade riksdagsledamöter</div>
+  </a>
 </div>
 
 <div id="riksdagsvy">
@@ -1533,6 +1566,76 @@ const T = {trend_json};
 const ALLA = {alla_json};
 const PARTIER = {partier_json};
 const FARGER = {partifarg_json};
+
+  /* --- Snabb tooltip ---------------------------------------------------
+     Webbläsarens egen title-tooltip dröjer nästan en sekund, vilket gör att
+     de flesta aldrig upptäcker den. Vi flyttar texten till data-tip och ritar
+     en egen ruta som visas direkt. */
+  (function() {{
+    const ruta = document.createElement('div');
+    ruta.className = 'snabbtip';
+    ruta.hidden = true;
+    document.body.appendChild(ruta);
+
+    function text(el) {{
+      if (el.getAttribute('data-tip')) return el.getAttribute('data-tip');
+
+      /* SVG-element bär sin tooltip i ett title-barn, inte i ett attribut. */
+      let t = el.getAttribute('title');
+      if (!t) {{
+        const barn = el.querySelector ? el.querySelector(':scope > title') : null;
+        if (barn) {{
+          t = barn.textContent;
+          barn.remove();            // annars visar webbläsaren sin egen ändå
+        }}
+      }} else {{
+        el.removeAttribute('title');
+      }}
+      if (t) el.setAttribute('data-tip', t);
+      return t;
+    }}
+
+    function visa(el, x, y) {{
+      const t = text(el);
+      if (!t) return;
+      ruta.innerHTML = t.split('\\n').map(function(rad, i) {{
+        return i === 0 ? '<strong>' + rad + '</strong>' : '<span>' + rad + '</span>';
+      }}).join('');
+      ruta.hidden = false;
+      const b = ruta.getBoundingClientRect();
+      let vx = x + 14, vy = y + 16;
+      if (vx + b.width > window.innerWidth - 8) vx = x - b.width - 14;
+      if (vy + b.height > window.innerHeight - 8) vy = y - b.height - 14;
+      ruta.style.left = Math.max(8, vx) + 'px';
+      ruta.style.top = Math.max(8, vy) + 'px';
+    }}
+
+    /* SVG-element saknar closest i äldre webbläsare, därav kontrollen. */
+    function traff(mal) {{
+      if (!mal) return null;
+      /* Kammarens punkter är SVG-cirklar med ett title-barn. */
+      if (mal.tagName === 'circle' || mal.tagName === 'title') {{
+        return mal.tagName === 'title' ? mal.parentNode : mal;
+      }}
+      if (!mal.closest) return null;
+      return mal.closest('[title],[data-tip]');
+    }}
+
+    document.addEventListener('mouseover', function(e) {{
+      const el = traff(e.target);
+      if (el) visa(el, e.clientX, e.clientY);
+    }});
+    document.addEventListener('mousemove', function(e) {{
+      if (ruta.hidden) return;
+      const el = traff(e.target);
+      if (el) visa(el, e.clientX, e.clientY);
+      else ruta.hidden = true;
+    }});
+    document.addEventListener('mouseout', function(e) {{
+      if (!traff(e.relatedTarget)) ruta.hidden = true;
+    }});
+    document.addEventListener('click', function() {{ ruta.hidden = true; }});
+  }})();
 
 /* --- Tema --- */
 (function() {{
