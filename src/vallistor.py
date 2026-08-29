@@ -1020,40 +1020,14 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
             har_kod = str(valkretskod).zfill(2)
             har_namn = str(valkretsnamn or "")
 
-            def _prio(rad):
-                """Ordningen kandidaterna prövas i för valkretsens mandat.
-
-                Bara den som står på flera listor placeras om. Den som står på
-                en enda lista har ingen valfrihet och behåller sin plats i
-                listordningen, oavsett var hen bor eller satt förra gången.
-                """
-                if not star_pa_flera_listor(parti, rad.get("namn")):
-                    return 2
-
-                if rad["historisk_valkrets_2022"] == har_kod:
-                    return 0  # satt i valkretsen 2022
-                if rad["hemvalkrets_2026"] and rad["hemvalkrets_2026"] == har_namn:
-                    return 1  # bor i valkretsen
-                if rad["historisk_valkrets_2022"] or rad["hemvalkrets_2026"]:
-                    return 3  # hör hemma någon annanstans, prövas sist
-                return 2      # ingen känd hemvist, följer listordningen
-
-            kandidater["historisk_prio"] = kandidater.apply(_prio, axis=1)
-            kandidater = kandidater.sort_values(
-                ["historisk_prio", "ordning", "kandidatnummer"])
+            # Ingen omsortering här. Vallagen fyller platserna i listordning,
+            # och först därefter löses dubbelvalen. Se _losa_dubbelval.
+            kandidater = kandidater.sort_values(["ordning", "kandidatnummer"])
         lista_valkretskod = str(lista.get("valkretskod") or "")
         lista_valkretsnamn = str(lista.get("valkretsnamn") or lista["listbeteckning"] or "")
         plats = 0
         for _, kandidat in kandidater.iterrows():
             historisk_vk = index.historisk_riksdagsvalkrets(parti, kandidat.get("namn"))
-            if (
-                valtyp == "RD"
-                and historisk_vk
-                and valkretskod
-                and historisk_vk != str(valkretskod).zfill(2)
-                and historisk_vk in reserverade_valkretsar
-            ):
-                continue
             kandidatnyckel = str(kandidat.get("kandidatnummer") or "").strip()
             if not kandidatnyckel:
                 kandidatnyckel = f"{parti}:{_norm(kandidat.get('namn'))}"
@@ -1118,38 +1092,203 @@ def kandidatprognos_riksdag(sammanfattning: pd.DataFrame,
                             index: VallisteIndex | None = None,
                             omrade: str | None = None,
                             utelamnade: list[dict] | None = None) -> pd.DataFrame:
-    """Predikterar riksdagsledamöter via prognosmandat per parti och valkrets."""
+    """Predikterar riksdagsledamöter enligt vallagens ordning.
+
+    Valet går till i två steg, och modellen följer samma ordning.
+
+    Först fylls varje valkrets platser uppifrån och ned i listordning, utan
+    hänsyn till var kandidaten hör hemma. Ett namn som står högt på en
+    rikstäckande lista blir därför preliminärt vald i flera valkretsar
+    samtidigt, precis som i verkligheten.
+
+    Sedan löses dubbelvalen. En kandidat som valts i flera valkretsar behåller
+    en plats och de övriga återförklaras lediga, varpå nästa namn på just den
+    listan tar över. Vallagen ger platsen där jämförelsetalet är högst, vilket
+    kräver rösträkning. Modellen väljer i stället den valkrets där kandidaten
+    satt 2022, annars hemkommunens valkrets, annars den där partiet är
+    starkast. Det är en approximation, men den bygger på rätt mekanism: en
+    person tar en plats, och den lediga går till nästa på listan.
+
+    En tidigare version hoppade i stället över kandidater som hörde hemma i en
+    annan valkrets redan i första steget. Det gav mandat till namn långt ner på
+    listorna även när den överhoppade inte fick något mandat alls någon
+    annanstans, vilket vallagen inte tillåter.
+    """
     index = index if index is not None else VallisteIndex(
         las_kandidaturer(), las_deltagande_partier())
     nedbrutet = _riksdagsmandat_per_valkrets(sammanfattning, index, omrade)
-    rader = []
-    valda_per_parti = {p: set() for p in cfg.PARTIER}
-    mandatvalkretsar_per_parti = {
-        parti: {
-            str(vk).zfill(2)
-            for vk in grupp["valkretskod"].astype(str)
-        }
-        for parti, grupp in nedbrutet.groupby("parti")
-    } if not nedbrutet.empty else {}
+    if nedbrutet.empty:
+        return pd.DataFrame(columns=KANDIDATKOLUMNER)
 
+    # Steg 1: fyll varje valkrets i listordning. Samma person kan bli vald i
+    # flera valkretsar, vilket löses i steg 2.
+    preliminart: list[dict] = []
     for _, rad in nedbrutet.iterrows():
-        parti = rad["parti"]
-        rader.extend(_valj_kandidater(
+        preliminart.extend(_valj_kandidater(
             index=index,
             valtyp="RD",
             valomradeskod="00",
             omradesnamn="Riket",
-            parti=parti,
+            parti=rad["parti"],
             partimandat=int(rad["mandat"]),
             listor=rad["listor"],
-            valda=valda_per_parti.setdefault(parti, set()),
+            valda=set(),          # ingen global spärr i första steget
             valkretskod=rad["valkretskod"],
             valkretsnamn=rad["valkretsnamn"],
             valkretsmetod=rad.get("valkretsmetod", ""),
-            reserverade_valkretsar=mandatvalkretsar_per_parti.get(parti, set()),
+            reserverade_valkretsar=set(),
             utelamnade=utelamnade,
         ))
-    return pd.DataFrame(rader, columns=KANDIDATKOLUMNER)
+
+    return _losa_dubbelval(preliminart, nedbrutet, index, utelamnade)
+
+
+
+def _ersattarrad(tom: dict, kandidat) -> dict:
+    """Bygger raden för den som tar över en ledig plats."""
+    rad = dict(tom)
+    rad.update({
+        "namn": kandidat["namn"],
+        "ordning": int(kandidat["ordning"]),
+        "kandidatnummer": str(kandidat.get("kandidatnummer") or ""),
+        "alder_pa_valdagen": kandidat.get("alder_pa_valdagen", ""),
+        "kon": kandidat.get("kon", ""),
+        "folkbokforingskommun": kandidat.get("folkbokforingskommun", ""),
+        "valsedelsuppgift": kandidat.get("valsedelsuppgift", ""),
+        "kandidatval_metod": "dubbelvalsavveckling",
+        "prioritetsskäl": (
+            f"Platsen blev ledig när {tom['namn']} tog sitt mandat i en annan "
+            "valkrets. Nästa möjliga namn på listan tar över."),
+    })
+    return rad
+
+
+def _losa_dubbelval(preliminart: list[dict], nedbrutet: pd.DataFrame,
+                    index: VallisteIndex,
+                    utelamnade: list[dict] | None) -> pd.DataFrame:
+    """Löser dubbelval och fyller de platser som blir lediga.
+
+    Motsvarar vallagens dubbelvalsavveckling: den som valts i flera valkretsar
+    behåller en plats, övriga återförklaras lediga och går till nästa namn på
+    listan i den valkretsen.
+    """
+    def nyckel(rad):
+        nr = str(rad.get("kandidatnummer") or "").strip()
+        return f'{rad["prognos_parti"]}:{nr}' if nr else \
+               f'{rad["prognos_parti"]}:{_norm(rad.get("namn"))}'
+
+    # Vilka valkretsar varje person valts i
+    platser: dict[str, list[dict]] = {}
+    for rad in preliminart:
+        platser.setdefault(nyckel(rad), []).append(rad)
+
+    # Partiets styrka per valkrets, för att avgöra var en person stannar när
+    # varken 2022 eller hemkommunen pekar ut en valkrets.
+    styrka = {}
+    for _, rad in nedbrutet.iterrows():
+        styrka[(rad["parti"], str(rad["valkretskod"]).zfill(2))] = int(rad["mandat"])
+
+    behalls: dict[str, dict] = {}
+    lediga: list[dict] = []
+    for _, rader in platser.items():
+        if len(rader) == 1:
+            behalls[id(rader[0])] = rader[0]
+            continue
+
+        parti = rader[0]["prognos_parti"]
+        namn = rader[0].get("namn")
+        hist = index.historisk_riksdagsvalkrets(parti, namn)
+        hem = hemvalkrets_for_kandidat(rader[0].get("folkbokforingskommun"))
+
+        def rang(rad):
+            kod = str(rad.get("valkretskod") or "").zfill(2)
+            if hist and kod == hist:
+                return (0, 0)
+            if hem and str(rad.get("valkretsnamn") or "") == hem:
+                return (1, 0)
+            return (2, -styrka.get((parti, kod), 0))
+
+        rader = sorted(rader, key=rang)
+        behalls[id(rader[0])] = rader[0]
+        lediga.extend(rader[1:])
+
+    # Fyll de lediga platserna med nästa namn på respektive lista.
+    tagna = {nyckel(r) for r in behalls.values()}
+    resultat = list(behalls.values())
+
+    # Lediga platser fylls i två svep över alla valkretsar samtidigt.
+    #
+    # Första svepet ger platsen till någon som hör hemma i valkretsen, alltså
+    # satt där 2022 eller bor där. Andra svepet fyller resten i listordning.
+    #
+    # Ordningen är nödvändig. Fylldes valkretsarna en i taget skulle en tidig
+    # valkrets kunna ta ett namn som hör hemma i en senare, och det namnet
+    # blockeras då från sin egen plats. Andreas Carlson satt i Jönköping 2022,
+    # men om Jönköping fylls först av någon annan hamnar han i Stockholm.
+    def _kandidatlista(tom):
+        parti = tom["prognos_parti"]
+        kand = index.kandidater_for_lista(
+            "RD", tom["omrade_kod"], parti, tom["listnummer"])
+        if kand.empty:
+            return None
+        return kand.sort_values(["ordning", "kandidatnummer"])
+
+    def _hemstyrka(parti, kandidat, vk_kod, vk_namn) -> int:
+        """Hur starkt kandidaten hör hemma i valkretsen.
+
+        0 = satt där 2022, 1 = bor där, 2 = hör inte hemma här.
+        Den som satt i valkretsen går före den som bara bor där, och båda går
+        före den som råkar stå högt på listan utan anknytning.
+        """
+        hist = index.historisk_riksdagsvalkrets(parti, kandidat.get("namn"))
+        if hist:
+            return 0 if hist == vk_kod else 2
+        hem = hemvalkrets_for_kandidat(kandidat.get("folkbokforingskommun"))
+        if hem:
+            return 1 if hem == vk_namn else 2
+        return 2
+
+    kvar = []
+    for tom in lediga:
+        kand = _kandidatlista(tom)
+        if kand is None:
+            continue
+        parti = tom["prognos_parti"]
+        vk_kod = str(tom.get("valkretskod") or "").zfill(2)
+        vk_namn = str(tom.get("valkretsnamn") or "")
+
+        # Svep 1: den som hör starkast hemma här, inte den som står högst
+        vald = None
+        basta = 3
+        for _, kandidat in kand.iterrows():
+            nr = str(kandidat.get("kandidatnummer") or "").strip()
+            kn = f"{parti}:{nr}" if nr else f"{parti}:{_norm(kandidat.get('namn'))}"
+            if kn in tagna:
+                continue
+            styrka = _hemstyrka(parti, kandidat, vk_kod, vk_namn)
+            if styrka < basta:
+                basta, vald = styrka, (kandidat, kn)
+                if styrka == 0:
+                    break
+        if vald and basta <= 1:
+            resultat.append(_ersattarrad(tom, vald[0]))
+            tagna.add(vald[1])
+        else:
+            kvar.append((tom, kand))
+
+    # Svep 2: resterande platser i listordning
+    for tom, kand in kvar:
+        parti = tom["prognos_parti"]
+        for _, kandidat in kand.iterrows():
+            nr = str(kandidat.get("kandidatnummer") or "").strip()
+            kn = f"{parti}:{nr}" if nr else f"{parti}:{_norm(kandidat.get('namn'))}"
+            if kn in tagna:
+                continue
+            resultat.append(_ersattarrad(tom, kandidat))
+            tagna.add(kn)
+            break
+
+    return pd.DataFrame(resultat, columns=KANDIDATKOLUMNER)
 
 
 def kandidatprognos_lokal(niva: str, sammanfattning: pd.DataFrame,
