@@ -639,6 +639,11 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
          kommuner: pd.DataFrame | None = None,
          valkretsar: pd.DataFrame | None = None) -> str:
 
+    # Antalet ledamöter räknas ur kandidatprognosen. Det är normalt 349, men
+    # blir lägre om någon valkrets saknar användbar vallista.
+    antal_ledamoter = (sum(len(v) for v in _riksdagsledamoter().values())
+                       or cfg.MANDAT_TOTALT)
+
     # --- Partirader
     partirader = []
     for _, r in sammanfattning.iterrows():
@@ -1457,7 +1462,7 @@ footer strong {{ color:var(--text); }}
   </a>
   <a class="fkort" href="ledamoter_2026.html">
     <div class="ftitel">Alla ledamöter {_pil()}</div>
-    <div class="ftext">Samtliga 346 prognosticerade riksdagsledamöter</div>
+    <div class="ftext">Samtliga {antal_ledamoter} prognosticerade riksdagsledamöter</div>
   </a>
   <a class="fkort" href="scenarier_2026.html">
     <div class="ftitel">Scenarier {_pil()}</div>

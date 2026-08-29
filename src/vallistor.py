@@ -832,6 +832,48 @@ def _valj_lista(listor: pd.DataFrame) -> tuple[pd.DataFrame, str, str, str | Non
     return vald, "proxy_flest_valsedlar", varning, None
 
 
+def _nastan_samma_namn(a: str, b: str) -> bool:
+    """Är två namn samma person, bortsett från en stavfelsartad avvikelse?
+
+    Samma lista registreras ibland två gånger med en felstavning i ett namn.
+    Centerpartiet i Stockholms kommun har två listnummer där enda skillnaden
+    är "Thand Rinqvist" mot "Thand Ringqvist". Att behandla dem som olika
+    listor kostar partiet hela valkretsens mandat i prognosen.
+
+    Tillåter en teckens skillnad i ett namn av rimlig längd. Det är snävt nog
+    att inte slå ihop två olika personer: syskon och namnar skiljer sig i
+    förnamn, inte i en enstaka bokstav.
+    """
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > 1 or min(len(a), len(b)) < 6:
+        return False
+
+    # Förnamnet måste stämma exakt. "Jan Ek" och "Jon Ek" skiljer sig på en
+    # bokstav men är två personer, medan en felstavning i praktiken alltid
+    # sitter i efternamnet.
+    fa, _, ea = a.partition(" ")
+    fb, _, eb = b.partition(" ")
+    if not ea or not eb or fa != fb:
+        return False
+
+    # Levenshteinavstånd med tak 1: räcker att hitta första avvikelsen och
+    # kontrollera att resten är lika efter ett hopp i det längre namnet.
+    if len(a) == len(b):
+        return sum(1 for x, y in zip(a, b) if x != y) == 1
+    kort, lang = (a, b) if len(a) < len(b) else (b, a)
+    i = 0
+    while i < len(kort) and kort[i] == lang[i]:
+        i += 1
+    return kort[i:] == lang[i + 1:]
+
+
+def _sekvenser_lika(a: tuple, b: tuple) -> bool:
+    """Två namnsekvenser som beskriver samma personer i samma ordning."""
+    return len(a) == len(b) and all(
+        _nastan_samma_namn(x, y) for x, y in zip(a, b))
+
+
 def _valj_identisk_topplista(index: VallisteIndex, valtyp: str, valomradeskod: str,
                             parti: str, listor: pd.DataFrame,
                             partimandat: int) -> tuple[pd.DataFrame, str, str, str | None]:
@@ -851,7 +893,8 @@ def _valj_identisk_topplista(index: VallisteIndex, valtyp: str, valomradeskod: s
                         .head(jamfor_antal)["namn"].map(_norm).tolist())
         sekvenser.append(sekvens)
 
-    if not sekvenser or not sekvenser[0] or any(s != sekvenser[0] for s in sekvenser[1:]):
+    if not sekvenser or not sekvenser[0] or any(
+            not _sekvenser_lika(sekvenser[0], s) for s in sekvenser[1:]):
         return listor, "", "", "flera listor med samma högsta valsedelsantal"
 
     vald = topp.sort_values("listnummer").head(1).copy()
