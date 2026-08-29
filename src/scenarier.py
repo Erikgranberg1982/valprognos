@@ -68,6 +68,38 @@ class Scenario:
     spurtdata: dict = field(default_factory=dict)
 
 
+def historiska_spurter() -> dict[int, dict]:
+    """Läser valspurter för val där modellen saknar egna mätningar.
+
+    2006, 2010 och 2014 finns inte i skraparens underlag: Wikipedias sidor för
+    dem har en annan tabellstruktur. Siffrorna i CSV-filen är hämtade för hand
+    från samma källa. De är enskilda mätningar, inte sammanvägningar, och de
+    ligger på olika avstånd från valdagen, vilket redovisas per val.
+    """
+    fil = ROT / "data" / "historiska_valspurter.csv"
+    if not fil.exists():
+        return {}
+
+    df = pd.read_csv(fil)
+    ut = {}
+    for ar, grupp in df.groupby("ar"):
+        rad = grupp.iloc[0]
+        ut[int(ar)] = {
+            "ar": int(ar),
+            "referensdatum": str(rad["matning_datum"]),
+            "referenstext": str(rad["matning_text"]),
+            "valdag": str(rad["valdag"]),
+            "dagar_fore_val": int(rad["dagar_fore_val"]),
+            "enskild_matning": True,
+            "antal_matningar": 1,
+            "pop": dict(zip(grupp["parti"], grupp["matning"])),
+            "utfall": dict(zip(grupp["parti"], grupp["utfall"])),
+            "spurt": {p: u - m for p, m, u
+                      in zip(grupp["parti"], grupp["matning"], grupp["utfall"])},
+        }
+    return ut
+
+
 def spurt_for_val(ar: int, dagar_kvar: int) -> dict:
     """Hur mycket varje parti flyttade sig de sista dagarna i ett tidigare val.
 
@@ -107,8 +139,15 @@ def valspurt(baslinje, dagar_kvar: int, ar: list[int]) -> tuple[dict, dict]:
     sexton dagar kvar jämförs med sexton dagar kvar i de tidigare valen. Ges
     flera år används genomsnittet av deras spurter.
     """
-    val = [spurt_for_val(a, dagar_kvar) for a in ar]
-    spurt = {p: sum(v["spurt"][p] for v in val) / len(val) for p in cfg.PARTIER}
+    hist = historiska_spurter()
+    val = [hist[a] if a in hist else spurt_for_val(a, dagar_kvar) for a in ar]
+
+    # Sverigedemokraterna saknas 2006, då partiet låg under tre procent och
+    # inte redovisades separat. Snittet tas över de val där partiet finns.
+    spurt = {}
+    for p in cfg.PARTIER:
+        varden = [v["spurt"][p] for v in val if p in v["spurt"]]
+        spurt[p] = sum(varden) / len(varden) if varden else 0.0
 
     nytt = {p: max(0.0, float(baslinje[p]) + spurt[p]) for p in cfg.PARTIER}
     summa = sum(nytt.values())
@@ -116,9 +155,12 @@ def valspurt(baslinje, dagar_kvar: int, ar: list[int]) -> tuple[dict, dict]:
 
     # Pekar valen åt samma håll? Med bara ett val är frågan inte meningsfull.
     if len(val) > 1:
-        ense = [p for p in cfg.PARTIER
-                if all(v["spurt"][p] > 0 for v in val)
-                or all(v["spurt"][p] < 0 for v in val)]
+        ense = []
+        for p in cfg.PARTIER:
+            varden = [v["spurt"][p] for v in val if p in v["spurt"]]
+            if len(varden) > 1 and (all(x > 0 for x in varden)
+                                    or all(x < 0 for x in varden)):
+                ense.append(p)
     else:
         ense = []
 
@@ -278,23 +320,21 @@ SCENARIER = [
     Scenario(
         id="snitt_valspurt",
         namn="Genomsnittlig valspurt",
-        fraga="Vad händer om upploppet liknar de två senaste valen i snitt?",
+        fraga="Vad händer om upploppet liknar de fem senaste valen i snitt?",
         beskrivning=(
             "Samma räkning som föregående scenario, men med genomsnittet av "
-            "valspurten 2018 och 2022 i stället för bara det senaste valet. "
-            "Att jämföra de två scenarierna säger mer än något av dem säger "
-            "ensamt: där de pekar åt olika håll finns inget mönster att luta "
-            "sig mot."
+            "valspurten 2006, 2010, 2014, 2018 och 2022 i stället för bara "
+            "det senaste valet. Att jämföra de två scenarierna säger mer än "
+            "något av dem säger ensamt: där de pekar åt olika håll finns "
+            "inget mönster att luta sig mot."
         ),
-        valspurt=[2018, 2022],
+        valspurt=[2006, 2010, 2014, 2018, 2022],
         forbehall=(
-            "Två val är fortfarande ett tunt underlag, och att ta "
-            "genomsnittet av två motsatta rörelser ger ett tal nära noll som "
+            "Inget parti rörde sig åt samma håll i alla fem valen. Närmast "
+            "kommer Miljöpartiet, som tappade i fyra av fem. Ett genomsnitt "
+            "av rörelser som pekar åt olika håll landar nära noll, vilket "
             "inte betyder att ingenting händer, bara att valen sa olika "
-            "saker. Bara Vänsterpartiet och Socialdemokraterna rörde sig åt "
-            "samma håll i båda valen. Wikipedias sidor för 2010 och 2014 har "
-            "en annan tabellstruktur som modellens skrapare inte tolkar, så "
-            "underlaget går inte att utöka utan handpåläggning."
+            "saker."
         ),
     ),
 

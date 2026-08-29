@@ -66,14 +66,29 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
     flera = len(val) > 1
     dk = info["dagar_kvar"]
 
-    kolumner = "".join(
-        f'<th class="ta">{v["ar"]}</th>' for v in val)
+    # Valen ligger på olika avstånd från valdagen, vilket måste synas i
+    # rubriken: 2010 års siffra är från 66 dagar före valet, 2006 års från 2.
+    kolumner = ""
+    for v in val:
+        if v.get("enskild_matning"):
+            kolumner += (f'<th class="ta" data-tip="{v["referenstext"]}, '
+                         f'{v["dagar_fore_val"]} dagar före valet. '
+                         f'Enskild mätning, inte sammanvägning.">'
+                         f'{v["ar"]}<span class="ast">*</span></th>')
+        else:
+            kolumner += (f'<th class="ta" data-tip="Sammanvägning av '
+                         f'{v["antal_matningar"]} mätningar {v["referensdatum"]}, '
+                         f'{dk} dagar före valet.">{v["ar"]}</th>')
     snittkol = '<th class="ta">Snitt</th>' if flera else ""
 
     rader = []
     for p in cfg.PARTIER:
         celler = []
         for v in val:
+            if p not in v["spurt"]:
+                celler.append('<td class="ta noll" data-tip="Partiet '
+                              'redovisades inte separat detta val">–</td>')
+                continue
             x = v["spurt"][p]
             kl = "upp" if x > 0.05 else ("ned" if x < -0.05 else "noll")
             celler.append(f'<td class="ta {kl}">{x:+.2f}</td>')
@@ -83,7 +98,8 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
             celler.append(f'<td class="ta {kl}"><strong>{x:+.2f}</strong></td>')
 
         # Markera partier där valen pekar åt olika håll.
-        oense = flera and p not in info["eniga_partier"]
+        varden = [v["spurt"][p] for v in val if p in v["spurt"]]
+        oense = flera and len(varden) > 1 and p not in info["eniga_partier"]
         markering = ' class="oense"' if oense else ""
         rader.append(
             f'<tr{markering}><td><span class="pp" '
@@ -94,9 +110,34 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
             + f'<td class="ta">{u["roster_bas"][p]:.1f}</td>'
               f'<td class="ta"><strong>{u["roster_nytt"][p]:.1f}</strong></td></tr>')
 
-    datum = ", ".join(f'{v["referensdatum"]} ({v["ar"]})' for v in val)
-    matn = " och ".join(
-        f'{v["antal_matningar"]} mätningar från {v["ar"]}' for v in val)
+    egna = [v for v in val if not v.get("enskild_matning")]
+    lanade = [v for v in val if v.get("enskild_matning")]
+
+    if egna:
+        egen_txt = (
+            " För " + " och ".join(str(v["ar"]) for v in egna) +
+            f" jämförs modellens egen sammanvägning {dk} dagar före valdagen, "
+            "alltså exakt samma avstånd som i dag.")
+    else:
+        egen_txt = ""
+
+    if lanade:
+        bitar = ", ".join(
+            f'{v["ar"]} från {v["referenstext"].lower()}, '
+            f'{v["dagar_fore_val"]} dagar före valet'
+            for v in lanade)
+        egen_txt += (
+            f" För {' och '.join(str(v['ar']) for v in lanade)} saknar modellen "
+            "mätningar och siffran kommer i stället från en enskild mätning "
+            f"hämtad för hand: {bitar}.")
+        lanad_txt = (
+            " Avstånden skiljer sig alltså åt, vilket är en verklig svaghet: "
+            "2010 års siffra beskriver ett helt kvartal, 2006 års bara de "
+            "sista dagarna. Kolumner märkta med <em>*</em> är enskilda "
+            "mätningar, inte sammanvägningar, och bär därför ett större "
+            "slumpfel.")
+    else:
+        lanad_txt = ""
 
     if flera:
         ense = info["eniga_partier"]
@@ -118,11 +159,9 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
   <h2>Underlaget</h2>
   <div class="rub">Vad som hände på upploppet</div>
   <div class="kort">
-    <p class="besk">I dag är det {dk} dagar kvar till valdagen. Lika många
-    dagar före tidigare val var det {datum}, och sammanvägningarna byggde på
-    {matn}. Kolumnerna visar skillnaden mellan sammanvägningen då
-    och det faktiska valresultatet, alltså den rörelse som skedde under de
-    sista {dk} dagarna.</p>
+    <p class="besk">I dag är det {dk} dagar kvar till valdagen. Kolumnerna
+    visar hur långt varje parti flyttade sig mellan opinionsläget och det
+    faktiska valresultatet i tidigare val.{egen_txt}{lanad_txt}</p>
     <div class="rulla">
     <table class="tab">
       <thead><tr><th>Parti</th>{kolumner}{snittkol}
@@ -437,6 +476,8 @@ border:1.5px solid transparent}}
 .rulla{{overflow-x:auto}}
 .lutrad td{{border-top:2px solid var(--linje);background:var(--panel)}}
 .flagga{{margin-left:7px;font-weight:800;color:var(--korall);cursor:help}}
+.ast{{color:var(--korall);font-weight:800}}
+.tab th[data-tip]{{cursor:help}}
 tr.oense td:first-child{{font-weight:600}}
 .varn{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
 gap:13px;margin-top:22px}}
