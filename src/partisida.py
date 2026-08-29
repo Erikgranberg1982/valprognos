@@ -16,10 +16,13 @@ import config as cfg
 ROT = Path(__file__).resolve().parent.parent
 
 METOD = {
-    "historisk_valkrets_2022": ("Satt här 2022", "sakert"),
-    "hemvalkrets_2026": ("Bor i valkretsen", "sakert"),
-    "dubbelvalsavveckling": ("Tog ledig plats", "medel"),
-    "listordning": ("Listordning", "medel"),
+    # Etiketten säger vad som är värt att veta. De flesta kandidater står på
+    # en enda lista och tar platsen i listordning, vilket inte behöver märkas
+    # ut. Bara den som står på flera listor har behövt placeras.
+    "listordning": ("", "sakert"),
+    "historisk_valkrets_2022": ("Står på flera listor", "medel"),
+    "hemvalkrets_2026": ("Står på flera listor", "medel"),
+    "dubbelvalsavveckling": ("Efter omfördelning", "medel"),
 }
 
 
@@ -192,6 +195,7 @@ gap:13px;margin-top:20px}}
 .vrub{{font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;
 color:var(--korall);margin-bottom:5px}}
 .vk p{{margin:0;font-size:12.5px;color:var(--svag);line-height:1.6}}
+.vk em{{font-style:normal;font-weight:600;color:var(--text)}}
 </style></head><body>
 <header><div class="w"><h1>Partierna i riksdagsvalet 2026</h1>
 <div class="sub">{dagar} dagar till valdagen · {matningar} mätningar i modellen</div>
@@ -228,10 +232,12 @@ color:var(--korall);margin-bottom:5px}}
     rösträkning. Modellen använder valkretsen personen satt i 2022, sedan
     hemkommunen.</p></div>
 
-    <div class="vk"><div class="vrub">Flera listor per parti</div>
-    <p>Ett parti kan ha både en rikstäckande lista och en för länet. Vilken
-    väljarna använder är okänt före valet. Listor märkta osäker lista är valda
-    på antagandet att den lokala används.</p></div>
+    <div class="vk"><div class="vrub">Vad märkningarna betyder</div>
+    <p>De flesta kandidater står på en enda lista och tar platsen i
+    listordning, vilket inte märks ut. <em>Står på flera listor</em> betyder
+    att kandidaten kan väljas i flera valkretsar och att modellen placerat
+    hen. <em>Efter omfördelning</em> betyder att någon högre upp tog sitt
+    mandat i en annan valkrets och platsen gick vidare.</p></div>
 
     <div class="vk"><div class="vrub">Träffsäkerhet</div>
     <p>Ett test mot 2022 ger rätt valkrets för 96 procent av de sittande
@@ -259,10 +265,10 @@ function rita(p){{
     var namn=v.kandidater.map(function(k){{
       var titel=k.n+(k.u?'\\n'+k.u:'')+
                 '\\nPlats '+k.p+' på listan '+k.l+
-                '\\n'+k.m+(k.v?'\\n'+k.v:'');
+                (k.m?'\\n'+k.m:'')+(k.v?'\\n'+k.v:'');
       return '<span class="kb" title="'+titel.replace(/"/g,'&quot;')+'">'+
              '<span class="kn">'+k.p+'</span>'+k.n+
-             '<span class="km '+k.niva+'">'+k.m+'</span></span>';
+             (k.m?'<span class="km '+k.niva+'">'+k.m+'</span>':'')+'</span>';
     }}).join('');
     return '<div class="vkrad"><div><div class="vknamn">'+v.vk+'</div>'+
            '<div class="vkmandat">'+v.mandat+(v.mandat===1?' mandat':' mandat')+

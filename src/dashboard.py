@@ -2294,9 +2294,10 @@ const LOKAL = {lokal_json};
                  '</span>';
         }}).join('');
 
+        /* Bara den som står på flera listor behöver märkas ut. */
         const flagga = p.niva === 'osakert'
           ? '<span class="kandvarn" title="' +
-            (p.v || '').replace(/"/g, '&quot;') + '">osäker lista</span>'
+            (p.v || '').replace(/"/g, '&quot;') + '">flera listor</span>'
           : '';
 
         return '<div class="kandparti">' +

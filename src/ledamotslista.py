@@ -15,10 +15,13 @@ import config as cfg
 ROT = Path(__file__).resolve().parent.parent
 
 METOD = {
-    "historisk_valkrets_2022": ("Satt här 2022", "sakert"),
-    "hemvalkrets_2026": ("Bor i valkretsen", "sakert"),
-    "dubbelvalsavveckling": ("Tog ledig plats", "medel"),
-    "listordning": ("Listordning", "medel"),
+    # Etiketten säger vad som är värt att veta. De flesta kandidater står på
+    # en enda lista och tar platsen i listordning, vilket inte behöver märkas
+    # ut. Bara den som står på flera listor har behövt placeras.
+    "listordning": ("", "sakert"),
+    "historisk_valkrets_2022": ("Står på flera listor", "medel"),
+    "hemvalkrets_2026": ("Står på flera listor", "medel"),
+    "dubbelvalsavveckling": ("Efter omfördelning", "medel"),
 }
 
 
@@ -66,7 +69,8 @@ def skriv(katalog: Path) -> Path | None:
             f'<td class="o">{ort if pd.notna(ort) else ""}</td>'
             f'<td class="t">{int(r["ord"])}</td>'
             f'<td class="l">{r["listbeteckning"]}</td>'
-            f'<td><span class="m {niv}">{txt}</span>{varn}</td></tr>')
+            f'<td>' + (f'<span class="m {niv}">{txt}</span>' if txt else '')
+            + f'{varn}</td></tr>')
 
     farg = "\n".join(f".p{p}{{background:{c}}}" for p, c in cfg.PARTIFARG.items())
     ordning = df.groupby("parti").size().sort_values(ascending=False).index

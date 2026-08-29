@@ -1077,19 +1077,35 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
             valda.add(kandidatnyckel)
             plats += 1
             hemvk = hemvalkrets_for_kandidat(kandidat.get("folkbokforingskommun"))
-            if valtyp == "RD" and historisk_vk and historisk_vk == str(valkretskod).zfill(2):
+            plats = int(kandidat["ordning"])
+
+            # Etiketten ska säga vad läsaren behöver veta, inte hur modellen
+            # resonerade. För de flesta kandidater står namnet på en enda lista
+            # och platsen följer direkt av listordningen. Bara den som står på
+            # flera listor har behövt placeras, och först då är skälet
+            # intressant.
+            if valtyp != "RD":
+                kandidatval_metod = "listordning"
+                prioritetsskal = f"Plats {plats} på listan."
+            elif not star_pa_flera_listor(parti, kandidat.get("namn")):
+                kandidatval_metod = "listordning"
+                prioritetsskal = (
+                    f"Plats {plats} på partiets lista i valkretsen. "
+                    "Kandidaten står bara på den listan.")
+            elif historisk_vk and historisk_vk == str(valkretskod).zfill(2):
                 kandidatval_metod = "historisk_valkrets_2022"
-                prioritetsskal = "Var invald i valkretsen 2022."
-            elif valtyp == "RD" and hemvk and hemvk == str(valkretsnamn or ""):
+                prioritetsskal = (
+                    f"Plats {plats} på listan. Står på flera listor och "
+                    "företräder valkretsen i dag, så platsen räknas hit.")
+            elif hemvk and hemvk == str(valkretsnamn or ""):
                 kandidatval_metod = "hemvalkrets_2026"
                 prioritetsskal = (
-                    f"Folkbokförd i {kandidat.get('folkbokforingskommun')}, "
+                    f"Plats {plats} på listan. Står på flera listor och är "
+                    f"folkbokförd i {kandidat.get('folkbokforingskommun')}, "
                     "som ligger i valkretsen.")
             else:
                 kandidatval_metod = "listordning"
-                prioritetsskal = (
-                    f"Plats {int(kandidat['ordning'])} på listan."
-                    if valtyp == "RD" else "")
+                prioritetsskal = f"Plats {plats} på listan."
             rader.append({
                 "niva": NIVA_FOR_VALTYP.get(valtyp, valtyp),
                 "valtyp": valtyp,
@@ -1198,8 +1214,8 @@ def _ersattarrad(tom: dict, kandidat) -> dict:
         "valsedelsuppgift": kandidat.get("valsedelsuppgift", ""),
         "kandidatval_metod": "dubbelvalsavveckling",
         "prioritetsskäl": (
-            f"Platsen blev ledig när {tom['namn']} tog sitt mandat i en annan "
-            "valkrets. Nästa möjliga namn på listan tar över."),
+            f"{tom['namn']} stod högre på listan men tar sitt mandat i en "
+            f"annan valkrets. Platsen går vidare till nästa namn."),
     })
     return rad
 
