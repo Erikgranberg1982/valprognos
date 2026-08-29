@@ -513,13 +513,10 @@ def _metod_lokal() -> str:
 
 
 def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
-    """Redovisar lokala mätningar på samma sätt som riksmätningarna.
+    """Redovisar de lokala mätningar som används i prognosen.
 
-    Varje mätning visas med alla partisiffror som publicerats, institut,
-    urval, datum och vikt. Mätningar som inte är fullständiga används inte i
-    prognosen, men redovisas ändå med skälet utsatt, eftersom det är
-    information läsaren behöver för att förstå varför ett område inte påverkas
-    av en mätning som ändå finns.
+    Bara mätningar som faktiskt vägs in listas. En ofullständig mätning
+    påverkar inte prognosen och hör därför inte hemma i redovisningen.
     """
     import lokala_partier
 
@@ -533,7 +530,7 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
     rader = []
     for _, rad in tabell.iterrows():
         matning = lokala_partier.matning_for_omrade(rad["niva"], rad["omrade_kod"])
-        if matning is None:
+        if matning is None or not matning["anvands"]:
             continue
 
         celler = []
@@ -547,31 +544,21 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
                      if matning["lokalt_stod"] is not None
                      else '<td class="tal dim">–</td>')
 
-        if matning["anvands"]:
-            status = (f'<span class="kallmarke matt">'
-                      f'Vikt {matning["vikt"]*100:.0f}%</span>')
-            skal = ""
-        else:
-            status = '<span class="kallmarke skalat">Används inte</span>'
-            saknade = ", ".join(matning["saknade"])
-            skal = (f'<div class="skalrad">Mätningen redovisar inte '
-                    f'{saknade}. En ofullständig mätning kan inte vägas in '
-                    f'konsekvent och används därför inte.</div>')
-
         uppdrag = (f' för {matning["uppdragsgivare"]}'
                    if matning["uppdragsgivare"] else "")
-        urval = f' · {matning["urval"]:,} svarande'.replace(",", "\u00a0") \
-            if matning["urval"] else ""
+        urval = (f' · {matning["urval"]:,} svarande'.replace(",", "\u00a0")
+                 if matning["urval"] else "")
 
         rader.append(f"""
         <tr>
           <td class="inst">{matning['institut']}{uppdrag}
             <div class="matningsmeta">{nivanamn.get(rad['niva'], rad['niva'])}
-            i {rad['omrade_namn']}{urval}</div>{skal}</td>
+            i {rad['omrade_namn']}{urval}</div></td>
           <td class="datum">{matning['datum']}</td>
           {''.join(celler)}
           {lokalcell}
-          <td>{status}</td>
+          <td class="tal"><span class="viktbricka">
+            {matning['vikt']*100:.0f}%</span></td>
         </tr>""")
 
     if not rader:
@@ -584,7 +571,7 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
 <div class="sektionsrubrik">Mätningar för enskilda kommuner och regioner</div>
 <div class="tabellwrap"><table>
   <thead><tr><th>Mätning</th><th>Datum</th>{partihuvud}
-    <th class="tal">Lokalt</th><th>Status</th></tr></thead>
+    <th class="tal">Lokalt</th><th class="tal">Vikt</th></tr></thead>
   <tbody>{''.join(rader)}</tbody>
 </table></div>
 <div class="notis">Lokala mätningar vägs samman med modellens skattning på samma
@@ -592,8 +579,6 @@ sätt som SCB:s partisympatiundersökning i regionprognosen, men med högre vikt
 eftersom de gäller exakt det område de används på. Vikten halveras på
 {cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar.</div>
 """
-
-
 
 
 def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
@@ -1156,8 +1141,7 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .vkdiff {{ display:block; font-size:10.5px; font-weight:600; }}
 .vkdiff.upp {{ color:var(--gron); }}
 .vkdiff.ned {{ color:var(--korall); }}
-.skalrad {{ font-size:11.5px; color:var(--korall-mork); font-weight:400;
-  margin-top:5px; max-width:330px; line-height:1.5; }}
+
 .metodkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:26px; box-shadow:var(--skugga); }}
 .metodingress {{ font-size:15px; margin:0 0 22px; max-width:660px; }}
