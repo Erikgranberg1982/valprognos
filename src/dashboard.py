@@ -1892,9 +1892,9 @@ const LOKAL = {lokal_json};
       if (!omr) return '';
       const pp = (omr.partier || []).filter(function(x) {{ return x.p === parti; }})[0];
       if (!pp || !pp.k) return '';
-      return '\n' + pp.k.slice(0, antal).map(function(t, i) {{
+      return '\\n' + pp.k.slice(0, antal).map(function(t, i) {{
         return (i + 1) + '. ' + kandidatnamn(t).namn;
-      }}).join('\n');
+      }}).join('\\n');
     }}
 
     let band = bandordning.map(function(p) {{
@@ -2183,8 +2183,8 @@ const LOKAL = {lokal_json};
            trettio mandat inte blir en trettio rader lång lista. */
         const brickor = p.k.slice(0, p.m).map(function(text, i) {{
           const k = kandidatnamn(text);
-          const titel = k.namn + (k.uppgift ? '\n' + k.uppgift : '') +
-                        '\nPlats ' + (i + 1) + ' av ' + p.m + ' för ' + p.p;
+          const titel = k.namn + (k.uppgift ? '\\n' + k.uppgift : '') +
+                        '\\nPlats ' + (i + 1) + ' av ' + p.m + ' för ' + p.p;
           return '<span class="kandbricka" title="' +
                  titel.replace(/"/g, '&quot;') + '">' +
                  '<span class="kandnr">' + (i + 1) + '</span>' + k.namn +

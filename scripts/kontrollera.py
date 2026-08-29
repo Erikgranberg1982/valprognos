@@ -102,6 +102,15 @@ def main() -> None:
     if "Så beräknas region och kommun" not in html:
         fel("Metodavsnittet för region och kommun saknas i sidan.")
 
+    # En JavaScript-sträng får inte innehålla en verklig radbrytning. Det
+    # händer när en f-string skriver \n i stället för dubbelt bakstreck-n, och
+    # bryter hela skriptet så att sidan slutar fungera utan synligt felmeddelande.
+    import re as _re
+    trasiga = len(_re.findall(r"'\n'", html))
+    if trasiga:
+        fel(f"{trasiga} JavaScript-strängar innehåller en verklig radbrytning. "
+            "Skriv dubbelt bakstreck-n i mallen.")
+
     # Kandidatprognosen ligger i en egen fil som måste följa med vid publicering.
     kandidater = sida.parent / "kandidater.json"
     if "kandblock" in html:
