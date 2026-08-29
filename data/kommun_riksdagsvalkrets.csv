@@ -1,0 +1,291 @@
+kommun,kommunkod,lan,valkrets
+Ale,1440,Västra Götaland,Västra Götalands läns västra
+Alingsås,1489,Västra Götaland,Västra Götalands läns södra
+Alvesta,0764,Kronoberg,Kronobergs län
+Aneby,0604,Jönköping,Jönköpings län
+Arboga,1984,Västmanland,Västmanlands län
+Arjeplog,2506,Norrbotten,Norrbottens län
+Arvidsjaur,2505,Norrbotten,Norrbottens län
+Arvika,1784,Värmland,Värmlands län
+Askersund,1882,Örebro,Örebro län
+Avesta,2084,Dalarna,Dalarnas län
+Bengtsfors,1460,Västra Götaland,Västra Götalands läns norra
+Berg,2326,Jämtland,Jämtlands län
+Bjurholm,2403,Västerbotten,Västerbottens län
+Bjuv,1260,Skåne,Skåne läns västra
+Boden,2582,Norrbotten,Norrbottens län
+Bollebygd,1443,Västra Götaland,Västra Götalands läns södra
+Bollnäs,2183,Gävleborg,Gävleborgs län
+Borgholm,0885,Kalmar,Kalmar län
+Borlänge,2081,Dalarna,Dalarnas län
+Borås,1490,Västra Götaland,Västra Götalands läns södra
+Botkyrka,0127,Stockholm,Stockholms län
+Boxholm,0560,Östergötland,Östergötlands län
+Bromölla,1272,Skåne,Skåne läns norra och östra
+Bräcke,2305,Jämtland,Jämtlands län
+Burlöv,1231,Skåne,Skåne läns södra
+Båstad,1278,Skåne,Skåne läns norra och östra
+Dals-Ed,1438,Västra Götaland,Västra Götalands läns norra
+Danderyd,0162,Stockholm,Stockholms län
+Degerfors,1862,Örebro,Örebro län
+Dorotea,2425,Västerbotten,Västerbottens län
+Eda,1730,Värmland,Värmlands län
+Ekerö,0125,Stockholm,Stockholms län
+Eksjö,0686,Jönköping,Jönköpings län
+Emmaboda,0862,Kalmar,Kalmar län
+Enköping,0381,Uppsala,Uppsala län
+Eskilstuna,0484,Södermanland,Södermanlands län
+Eslöv,1285,Skåne,Skåne läns södra
+Essunga,1445,Västra Götaland,Västra Götalands läns östra
+Fagersta,1982,Västmanland,Västmanlands län
+Falkenberg,1382,Halland,Hallands län
+Falköping,1499,Västra Götaland,Västra Götalands läns östra
+Falun,2080,Dalarna,Dalarnas län
+Filipstad,1782,Värmland,Värmlands län
+Finspång,0562,Östergötland,Östergötlands län
+Flen,0482,Södermanland,Södermanlands län
+Forshaga,1763,Värmland,Värmlands län
+Färgelanda,1439,Västra Götaland,Västra Götalands läns norra
+Gagnef,2026,Dalarna,Dalarnas län
+Gislaved,0662,Jönköping,Jönköpings län
+Gnesta,0461,Södermanland,Södermanlands län
+Gnosjö,0617,Jönköping,Jönköpings län
+Gotland,0980,Gotland,Gotlands län
+Grums,1764,Värmland,Värmlands län
+Grästorp,1444,Västra Götaland,Västra Götalands läns östra
+Gullspång,1447,Västra Götaland,Västra Götalands läns östra
+Gällivare,2523,Norrbotten,Norrbottens län
+Gävle,2180,Gävleborg,Gävleborgs län
+Göteborg,1480,Västra Götaland,Göteborgs kommun
+Götene,1471,Västra Götaland,Västra Götalands läns östra
+Habo,0643,Jönköping,Jönköpings län
+Hagfors,1783,Värmland,Värmlands län
+Hallsberg,1861,Örebro,Örebro län
+Hallstahammar,1961,Västmanland,Västmanlands län
+Halmstad,1380,Halland,Hallands län
+Hammarö,1761,Värmland,Värmlands län
+Haninge,0136,Stockholm,Stockholms län
+Haparanda,2583,Norrbotten,Norrbottens län
+Heby,0331,Uppsala,Uppsala län
+Hedemora,2083,Dalarna,Dalarnas län
+Helsingborg,1283,Skåne,Skåne läns västra
+Herrljunga,1466,Västra Götaland,Västra Götalands läns södra
+Hjo,1497,Västra Götaland,Västra Götalands läns östra
+Hofors,2104,Gävleborg,Gävleborgs län
+Huddinge,0126,Stockholm,Stockholms län
+Hudiksvall,2184,Gävleborg,Gävleborgs län
+Hultsfred,0860,Kalmar,Kalmar län
+Hylte,1315,Halland,Hallands län
+Hällefors,1863,Örebro,Örebro län
+Härjedalen,2361,Jämtland,Jämtlands län
+Härnösand,2280,Västernorrland,Västernorrlands län
+Härryda,1401,Västra Götaland,Västra Götalands läns västra
+Hässleholm,1293,Skåne,Skåne läns norra och östra
+Håbo,0305,Uppsala,Uppsala län
+Höganäs,1284,Skåne,Skåne läns västra
+Högsby,0821,Kalmar,Kalmar län
+Hörby,1266,Skåne,Skåne läns norra och östra
+Höör,1267,Skåne,Skåne läns södra
+Jokkmokk,2510,Norrbotten,Norrbottens län
+Järfälla,0123,Stockholm,Stockholms län
+Jönköping,0680,Jönköping,Jönköpings län
+Kalix,2514,Norrbotten,Norrbottens län
+Kalmar,0880,Kalmar,Kalmar län
+Karlsborg,1446,Västra Götaland,Västra Götalands läns östra
+Karlshamn,1082,Blekinge,Blekinge län
+Karlskoga,1883,Örebro,Örebro län
+Karlskrona,1080,Blekinge,Blekinge län
+Karlstad,1780,Värmland,Värmlands län
+Katrineholm,0483,Södermanland,Södermanlands län
+Kil,1715,Värmland,Värmlands län
+Kinda,0513,Östergötland,Östergötlands län
+Kiruna,2584,Norrbotten,Norrbottens län
+Klippan,1276,Skåne,Skåne läns västra
+Knivsta,0330,Uppsala,Uppsala län
+Kramfors,2282,Västernorrland,Västernorrlands län
+Kristianstad,1290,Skåne,Skåne läns norra och östra
+Kristinehamn,1781,Värmland,Värmlands län
+Krokom,2309,Jämtland,Jämtlands län
+Kumla,1881,Örebro,Örebro län
+Kungsbacka,1384,Halland,Hallands län
+Kungsör,1960,Västmanland,Västmanlands län
+Kungälv,1482,Västra Götaland,Västra Götalands läns västra
+Kävlinge,1261,Skåne,Skåne läns södra
+Köping,1983,Västmanland,Västmanlands län
+Laholm,1381,Halland,Hallands län
+Landskrona,1282,Skåne,Skåne läns västra
+Laxå,1860,Örebro,Örebro län
+Lekeberg,1814,Örebro,Örebro län
+Leksand,2029,Dalarna,Dalarnas län
+Lerum,1441,Västra Götaland,Västra Götalands läns västra
+Lessebo,0761,Kronoberg,Kronobergs län
+Lidingö,0186,Stockholm,Stockholms län
+Lidköping,1494,Västra Götaland,Västra Götalands läns östra
+Lilla Edet,1462,Västra Götaland,Västra Götalands läns västra
+Lindesberg,1885,Örebro,Örebro län
+Linköping,0580,Östergötland,Östergötlands län
+Ljungby,0781,Kronoberg,Kronobergs län
+Ljusdal,2161,Gävleborg,Gävleborgs län
+Ljusnarsberg,1864,Örebro,Örebro län
+Lomma,1262,Skåne,Skåne läns södra
+Ludvika,2085,Dalarna,Dalarnas län
+Luleå,2580,Norrbotten,Norrbottens län
+Lund,1281,Skåne,Skåne läns södra
+Lycksele,2481,Västerbotten,Västerbottens län
+Lysekil,1484,Västra Götaland,Västra Götalands läns norra
+Malmö,1280,Skåne,Malmö kommun
+Malung-Sälen,2023,Dalarna,Dalarnas län
+Malå,2418,Västerbotten,Västerbottens län
+Mariestad,1493,Västra Götaland,Västra Götalands läns östra
+Mark,1463,Västra Götaland,Västra Götalands läns södra
+Markaryd,0767,Kronoberg,Kronobergs län
+Mellerud,1461,Västra Götaland,Västra Götalands läns norra
+Mjölby,0586,Östergötland,Östergötlands län
+Mora,2062,Dalarna,Dalarnas län
+Motala,0583,Östergötland,Östergötlands län
+Mullsjö,0642,Jönköping,Jönköpings län
+Munkedal,1430,Västra Götaland,Västra Götalands läns norra
+Munkfors,1762,Värmland,Värmlands län
+Mölndal,1481,Västra Götaland,Västra Götalands läns västra
+Mönsterås,0861,Kalmar,Kalmar län
+Mörbylånga,0840,Kalmar,Kalmar län
+Nacka,0182,Stockholm,Stockholms län
+Nora,1884,Örebro,Örebro län
+Norberg,1962,Västmanland,Västmanlands län
+Nordanstig,2132,Gävleborg,Gävleborgs län
+Nordmaling,2401,Västerbotten,Västerbottens län
+Norrköping,0581,Östergötland,Östergötlands län
+Norrtälje,0188,Stockholm,Stockholms län
+Norsjö,2417,Västerbotten,Västerbottens län
+Nybro,0881,Kalmar,Kalmar län
+Nykvarn,0140,Stockholm,Stockholms län
+Nyköping,0480,Södermanland,Södermanlands län
+Nynäshamn,0192,Stockholm,Stockholms län
+Nässjö,0682,Jönköping,Jönköpings län
+Ockelbo,2101,Gävleborg,Gävleborgs län
+Olofström,1060,Blekinge,Blekinge län
+Orsa,2034,Dalarna,Dalarnas län
+Orust,1421,Västra Götaland,Västra Götalands läns västra
+Osby,1273,Skåne,Skåne läns norra och östra
+Oskarshamn,0882,Kalmar,Kalmar län
+Ovanåker,2121,Gävleborg,Gävleborgs län
+Oxelösund,0481,Södermanland,Södermanlands län
+Pajala,2521,Norrbotten,Norrbottens län
+Partille,1402,Västra Götaland,Västra Götalands läns västra
+Perstorp,1275,Skåne,Skåne läns västra
+Piteå,2581,Norrbotten,Norrbottens län
+Ragunda,2303,Jämtland,Jämtlands län
+Robertsfors,2409,Västerbotten,Västerbottens län
+Ronneby,1081,Blekinge,Blekinge län
+Rättvik,2031,Dalarna,Dalarnas län
+Sala,1981,Västmanland,Västmanlands län
+Salem,0128,Stockholm,Stockholms län
+Sandviken,2181,Gävleborg,Gävleborgs län
+Sigtuna,0191,Stockholm,Stockholms län
+Simrishamn,1291,Skåne,Skåne läns södra
+Sjöbo,1265,Skåne,Skåne läns södra
+Skara,1495,Västra Götaland,Västra Götalands läns östra
+Skellefteå,2482,Västerbotten,Västerbottens län
+Skinnskatteberg,1904,Västmanland,Västmanlands län
+Skurup,1264,Skåne,Skåne läns södra
+Skövde,1496,Västra Götaland,Västra Götalands läns östra
+Smedjebacken,2061,Dalarna,Dalarnas län
+Sollefteå,2283,Västernorrland,Västernorrlands län
+Sollentuna,0163,Stockholm,Stockholms län
+Solna,0184,Stockholm,Stockholms län
+Sorsele,2422,Västerbotten,Västerbottens län
+Sotenäs,1427,Västra Götaland,Västra Götalands läns norra
+Staffanstorp,1230,Skåne,Skåne läns södra
+Stenungsund,1415,Västra Götaland,Västra Götalands läns västra
+Stockholm,0180,Stockholm,Stockholms kommun
+Storfors,1760,Värmland,Värmlands län
+Storuman,2421,Västerbotten,Västerbottens län
+Strängnäs,0486,Södermanland,Södermanlands län
+Strömstad,1486,Västra Götaland,Västra Götalands läns norra
+Strömsund,2313,Jämtland,Jämtlands län
+Sundbyberg,0183,Stockholm,Stockholms län
+Sundsvall,2281,Västernorrland,Västernorrlands län
+Sunne,1766,Värmland,Värmlands län
+Surahammar,1907,Västmanland,Västmanlands län
+Svalöv,1214,Skåne,Skåne läns västra
+Svedala,1263,Skåne,Skåne läns södra
+Svenljunga,1465,Västra Götaland,Västra Götalands läns södra
+Säffle,1785,Värmland,Värmlands län
+Säter,2082,Dalarna,Dalarnas län
+Sävsjö,0684,Jönköping,Jönköpings län
+Söderhamn,2182,Gävleborg,Gävleborgs län
+Söderköping,0582,Östergötland,Östergötlands län
+Södertälje,0181,Stockholm,Stockholms län
+Sölvesborg,1083,Blekinge,Blekinge län
+Tanum,1435,Västra Götaland,Västra Götalands läns norra
+Tibro,1472,Västra Götaland,Västra Götalands läns östra
+Tidaholm,1498,Västra Götaland,Västra Götalands läns östra
+Tierp,0360,Uppsala,Uppsala län
+Timrå,2262,Västernorrland,Västernorrlands län
+Tingsryd,0763,Kronoberg,Kronobergs län
+Tjörn,1419,Västra Götaland,Västra Götalands läns västra
+Tomelilla,1270,Skåne,Skåne läns södra
+Torsby,1737,Värmland,Värmlands län
+Torsås,0834,Kalmar,Kalmar län
+Tranemo,1452,Västra Götaland,Västra Götalands läns södra
+Tranås,0687,Jönköping,Jönköpings län
+Trelleborg,1287,Skåne,Skåne läns södra
+Trollhättan,1488,Västra Götaland,Västra Götalands läns norra
+Trosa,0488,Södermanland,Södermanlands län
+Tyresö,0138,Stockholm,Stockholms län
+Täby,0160,Stockholm,Stockholms län
+Töreboda,1473,Västra Götaland,Västra Götalands läns östra
+Uddevalla,1485,Västra Götaland,Västra Götalands läns norra
+Ulricehamn,1491,Västra Götaland,Västra Götalands läns södra
+Umeå,2480,Västerbotten,Västerbottens län
+Upplands Väsby,0114,Stockholm,Stockholms län
+Upplands-Bro,0139,Stockholm,Stockholms län
+Uppsala,0380,Uppsala,Uppsala län
+Uppvidinge,0760,Kronoberg,Kronobergs län
+Vadstena,0584,Östergötland,Östergötlands län
+Vaggeryd,0665,Jönköping,Jönköpings län
+Valdemarsvik,0563,Östergötland,Östergötlands län
+Vallentuna,0115,Stockholm,Stockholms län
+Vansbro,2021,Dalarna,Dalarnas län
+Vara,1470,Västra Götaland,Västra Götalands läns östra
+Varberg,1383,Halland,Hallands län
+Vaxholm,0187,Stockholm,Stockholms län
+Vellinge,1233,Skåne,Skåne läns södra
+Vetlanda,0685,Jönköping,Jönköpings län
+Vilhelmina,2462,Västerbotten,Västerbottens län
+Vimmerby,0884,Kalmar,Kalmar län
+Vindeln,2404,Västerbotten,Västerbottens län
+Vingåker,0428,Södermanland,Södermanlands län
+Vänersborg,1487,Västra Götaland,Västra Götalands läns norra
+Vännäs,2460,Västerbotten,Västerbottens län
+Värmdö,0120,Stockholm,Stockholms län
+Värnamo,0683,Jönköping,Jönköpings län
+Västervik,0883,Kalmar,Kalmar län
+Västerås,1980,Västmanland,Västmanlands län
+Växjö,0780,Kronoberg,Kronobergs län
+Vårgårda,1442,Västra Götaland,Västra Götalands läns södra
+Ydre,0512,Östergötland,Östergötlands län
+Ystad,1286,Skåne,Skåne läns södra
+Älmhult,0765,Kronoberg,Kronobergs län
+Älvdalen,2039,Dalarna,Dalarnas län
+Älvkarleby,0319,Uppsala,Uppsala län
+Älvsbyn,2560,Norrbotten,Norrbottens län
+Ängelholm,1292,Skåne,Skåne läns västra
+Åmål,1492,Västra Götaland,Västra Götalands läns norra
+Ånge,2260,Västernorrland,Västernorrlands län
+Åre,2321,Jämtland,Jämtlands län
+Årjäng,1765,Värmland,Värmlands län
+Åsele,2463,Västerbotten,Västerbottens län
+Åstorp,1277,Skåne,Skåne läns västra
+Åtvidaberg,0561,Östergötland,Östergötlands län
+Öckerö,1407,Västra Götaland,Västra Götalands läns västra
+Ödeshög,0509,Östergötland,Östergötlands län
+Örebro,1880,Örebro,Örebro län
+Örkelljunga,1257,Skåne,Skåne läns västra
+Örnsköldsvik,2284,Västernorrland,Västernorrlands län
+Östersund,2380,Jämtland,Jämtlands län
+Österåker,0117,Stockholm,Stockholms län
+Östhammar,0382,Uppsala,Uppsala län
+Östra Göinge,1256,Skåne,Skåne läns norra och östra
+Överkalix,2513,Norrbotten,Norrbottens län
+Övertorneå,2518,Norrbotten,Norrbottens län

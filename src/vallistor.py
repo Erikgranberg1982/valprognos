@@ -161,6 +161,44 @@ def _norm(text: object) -> str:
     return " ".join(str(text or "").strip().casefold().split())
 
 
+
+# Kommun till riksdagsvalkrets. Ett län är en valkrets, utom Stockholm, Skåne
+# och Västra Götaland som är delade. Används för att placera en kandidat i sin
+# hemvalkrets när partiet har mandat där.
+_HEMVALKRETS: dict[str, str] | None = None
+
+
+def _hemvalkrets_tabell() -> dict[str, str]:
+    global _HEMVALKRETS
+    if _HEMVALKRETS is not None:
+        return _HEMVALKRETS
+    fil = Path(__file__).resolve().parent.parent / "data" / "kommun_riksdagsvalkrets.csv"
+    ut: dict[str, str] = {}
+    if fil.exists():
+        try:
+            tabell = pd.read_csv(fil, dtype=str)
+            for _, rad in tabell.iterrows():
+                ut[_norm(rad["kommun"])] = str(rad["valkrets"])
+        except Exception:
+            pass
+    _HEMVALKRETS = ut
+    return ut
+
+
+def hemvalkrets_for_kandidat(folkbokforingskommun: object) -> str:
+    """Riksdagsvalkretsen som kandidatens hemkommun tillhör.
+
+    En kandidat som står på flera listor placeras hellre i sin hemvalkrets än
+    där hen råkar stå högst. Regeln är en approximation av vad
+    dubbelvalsavvecklingen ger: personröster är oftast starkast på hemorten,
+    och den som blir vald på flera håll behåller platsen där personrösternas
+    andel är högst.
+    """
+    kommun = _norm(folkbokforingskommun)
+    if not kommun:
+        return ""
+    return _hemvalkrets_tabell().get(kommun, "")
+
 def _zfill_text(varde: object, langd: int) -> str:
     text = str(varde or "").strip()
     return text.zfill(langd) if text else ""
@@ -869,9 +907,29 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
             kandidater["historisk_valkrets_2022"] = kandidater["namn"].map(
                 lambda namn: index.historisk_riksdagsvalkrets(parti, namn)
             )
-            kandidater["historisk_prio"] = kandidater["historisk_valkrets_2022"].eq(
-                str(valkretskod).zfill(2)
-            ).map({True: 0, False: 1})
+            kandidater["hemvalkrets_2026"] = kandidater[
+                "folkbokforingskommun"].map(hemvalkrets_for_kandidat)
+
+            # Prioritetsordning för vem som tar mandatet i valkretsen:
+            #   0  var invald här 2022
+            #   1  har sin hemkommun här
+            #   2  övriga, enligt listordning
+            # Kandidater som hör hemma i en annan valkrets sorteras sist, så
+            # att ett nationellt toppnamn inte tar en plats där hen inte hör
+            # hemma bara för att hen står överst på listan.
+            har_kod = str(valkretskod).zfill(2)
+            har_namn = str(valkretsnamn or "")
+
+            def _prio(rad):
+                if rad["historisk_valkrets_2022"] == har_kod:
+                    return 0
+                if rad["hemvalkrets_2026"] and rad["hemvalkrets_2026"] == har_namn:
+                    return 1
+                if rad["historisk_valkrets_2022"] or rad["hemvalkrets_2026"]:
+                    return 3  # hör hemma någon annanstans
+                return 2
+
+            kandidater["historisk_prio"] = kandidater.apply(_prio, axis=1)
             kandidater = kandidater.sort_values(
                 ["historisk_prio", "ordning", "kandidatnummer"])
         lista_valkretskod = str(lista.get("valkretskod") or "")
@@ -894,11 +952,20 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
                 continue
             valda.add(kandidatnyckel)
             plats += 1
-            kandidatval_metod = (
-                "historisk_valkrets_2022"
-                if valtyp == "RD" and historisk_vk and historisk_vk == str(valkretskod).zfill(2)
-                else "listordning"
-            )
+            hemvk = hemvalkrets_for_kandidat(kandidat.get("folkbokforingskommun"))
+            if valtyp == "RD" and historisk_vk and historisk_vk == str(valkretskod).zfill(2):
+                kandidatval_metod = "historisk_valkrets_2022"
+                prioritetsskal = "Var invald i valkretsen 2022."
+            elif valtyp == "RD" and hemvk and hemvk == str(valkretsnamn or ""):
+                kandidatval_metod = "hemvalkrets_2026"
+                prioritetsskal = (
+                    f"Folkbokförd i {kandidat.get('folkbokforingskommun')}, "
+                    "som ligger i valkretsen.")
+            else:
+                kandidatval_metod = "listordning"
+                prioritetsskal = (
+                    f"Plats {int(kandidat['ordning'])} på listan."
+                    if valtyp == "RD" else "")
             rader.append({
                 "niva": NIVA_FOR_VALTYP.get(valtyp, valtyp),
                 "valtyp": valtyp,
@@ -919,6 +986,8 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
                 "valkretsmetod": valkretsmetod,
                 "kandidatval_metod": kandidatval_metod,
                 "historisk_valkrets_2022": historisk_vk,
+                "hemvalkrets_2026": hemvk if valtyp == "RD" else "",
+                "prioritetsskäl": prioritetsskal,
                 "deltagandegrund": str(lista.get("deltagandegrund") or ""),
                 "listmandat": int(mandat),
                 "mandat_i_lista": plats,
