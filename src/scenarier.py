@@ -91,6 +91,8 @@ def historiska_spurter() -> dict[int, dict]:
             "valdag": str(rad["valdag"]),
             "dagar_fore_val": int(rad["dagar_fore_val"]),
             "enskild_matning": True,
+            "institut": ("" if pd.isna(rad.get("institut"))
+                         else str(rad.get("institut")).strip()),
             "antal_matningar": 1,
             "pop": dict(zip(grupp["parti"], grupp["matning"])),
             "utfall": dict(zip(grupp["parti"], grupp["utfall"])),
@@ -330,11 +332,12 @@ SCENARIER = [
         ),
         valspurt=[2006, 2010, 2014, 2018, 2022],
         forbehall=(
-            "Inget parti rörde sig åt samma håll i alla fem valen. Närmast "
-            "kommer Miljöpartiet, som tappade i fyra av fem. Ett genomsnitt "
-            "av rörelser som pekar åt olika håll landar nära noll, vilket "
-            "inte betyder att ingenting händer, bara att valen sa olika "
-            "saker."
+            "Bara Socialdemokraterna rörde sig åt samma håll i alla fem "
+            "valen, och i fyra av dem med mindre än två procentenheter. "
+            "Miljöpartiet och Vänsterpartiet tappade i fyra av fem. För "
+            "övriga partier pekar valen åt olika håll, och ett genomsnitt av "
+            "motsatta rörelser landar nära noll, vilket inte betyder att "
+            "ingenting händer, bara att valen sa olika saker."
         ),
     ),
 

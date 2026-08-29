@@ -71,9 +71,14 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
     kolumner = ""
     for v in val:
         if v.get("enskild_matning"):
+            inst = v.get("institut")
+            varning = (f'En enda mätning från {inst}, inte en sammanvägning: '
+                       f'bär både slumpfel och {inst}s egen husfaktor.'
+                       if inst else
+                       'Enskild mätning, inte en sammanvägning över flera '
+                       'institut.')
             kolumner += (f'<th class="ta" data-tip="{v["referenstext"]}, '
-                         f'{v["dagar_fore_val"]} dagar före valet. '
-                         f'Enskild mätning, inte sammanvägning.">'
+                         f'{v["dagar_fore_val"]} dagar före valet. {varning}">'
                          f'{v["ar"]}<span class="ast">*</span></th>')
         else:
             kolumner += (f'<th class="ta" data-tip="Sammanvägning av '
@@ -110,12 +115,19 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
             + f'<td class="ta">{u["roster_bas"][p]:.1f}</td>'
               f'<td class="ta"><strong>{u["roster_nytt"][p]:.1f}</strong></td></tr>')
 
+    def _lista(namn):
+        """En, två eller flera: 'A', 'A och B', 'A, B och C'."""
+        namn = [str(x) for x in namn]
+        if len(namn) <= 1:
+            return "".join(namn)
+        return ", ".join(namn[:-1]) + " och " + namn[-1]
+
     egna = [v for v in val if not v.get("enskild_matning")]
     lanade = [v for v in val if v.get("enskild_matning")]
 
     if egna:
         egen_txt = (
-            " För " + " och ".join(str(v["ar"]) for v in egna) +
+            " För " + _lista([v["ar"] for v in egna]) +
             f" jämförs modellens egen sammanvägning {dk} dagar före valdagen, "
             "alltså exakt samma avstånd som i dag.")
     else:
@@ -123,19 +135,28 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
 
     if lanade:
         bitar = ", ".join(
-            f'{v["ar"]} från {v["referenstext"].lower()}, '
+            f'{v["ar"]} från {v["referenstext"][0].lower() + v["referenstext"][1:]}, '
             f'{v["dagar_fore_val"]} dagar före valet'
             for v in lanade)
         egen_txt += (
-            f" För {' och '.join(str(v['ar']) for v in lanade)} saknar modellen "
+            f" För {_lista([v['ar'] for v in lanade])} saknar modellen "
             "mätningar och siffran kommer i stället från en enskild mätning "
             f"hämtad för hand: {bitar}.")
+        med_inst = [v for v in lanade if v.get("institut")]
+        instdel = ""
+        if med_inst:
+            instdel = (
+                " " + " ".join(
+                    f'{v["ar"]} års tal kommer från en enda mätning av '
+                    f'{v["institut"]}, vilket är en svagare grund än en '
+                    f'sammanvägning: det bär både slumpfelet i en enskild '
+                    f'mätning och {v["institut"]}s egen husfaktor.'
+                    for v in med_inst))
         lanad_txt = (
             " Avstånden skiljer sig alltså åt, vilket är en verklig svaghet: "
-            "2010 års siffra beskriver ett helt kvartal, 2006 års bara de "
-            "sista dagarna. Kolumner märkta med <em>*</em> är enskilda "
-            "mätningar, inte sammanvägningar, och bär därför ett större "
-            "slumpfel.")
+            "2010 års siffra beskriver ett helt kvartal, medan 2006 och 2014 "
+            "ligger nära vårt eget avstånd. Kolumner märkta med <em>*</em> är "
+            "enskilda mätningar, inte sammanvägningar." + instdel)
     else:
         lanad_txt = ""
 
