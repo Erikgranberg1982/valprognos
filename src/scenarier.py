@@ -22,6 +22,11 @@ import modell
 VALKRETSMANDAT = {"Örebro län": 12}
 
 
+# Institut med tät och jämn publicering, som gör en trendlinje meningsfull.
+TRENDINSTITUT = ["Demoskop", "Novus"]
+TRENDSTART = "2026-06-01"
+
+
 @dataclass
 class Scenario:
     id: str
@@ -34,6 +39,53 @@ class Scenario:
     # Ett parti utanför de åtta som tar mandat via valkretsspärren.
     valkretsparti: dict | None = None
     forbehall: str = ""
+    # Räknas ur mätdata i stället för att anges för hand.
+    trend: bool = False
+    trenddata: dict = field(default_factory=dict)
+
+
+def trendforflyttning(matningar) -> tuple[dict, dict]:
+    """Extrapolerar Demoskop och Novus sommartrend fram till valdagen.
+
+    En rät linje läggs genom varje partis mätvärden från juni och framåt och
+    förlängs till valdagen. Linjerna dras oberoende av varandra, så summan
+    hamnar sällan på hundra och normaliseras efteråt.
+    """
+    import numpy as np
+
+    m = matningar[
+        matningar["institut"].isin(TRENDINSTITUT)
+        & (matningar["datum"] >= pd.Timestamp(TRENDSTART))
+    ].copy()
+    if len(m) < 4:
+        raise ValueError(
+            f"För få mätningar för trendlinjen: {len(m)} sedan {TRENDSTART}.")
+
+    start = pd.Timestamp(TRENDSTART)
+    t = (m["datum"] - start).dt.days.to_numpy()
+    t_val = (pd.Timestamp(cfg.VALDAG) - start).days
+
+    ra = {}
+    lutningar = {}
+    for parti in cfg.PARTIER:
+        lut, intercept = np.polyfit(t, m[parti].to_numpy(), 1)
+        ra[parti] = max(0.0, lut * t_val + intercept)
+        lutningar[parti] = lut * 30.44   # procentenheter per månad
+
+    summa = sum(ra.values())
+    normaliserad = {p: v * 100 / summa for p, v in ra.items()}
+
+    info = {
+        "antal": len(m),
+        "institut": sorted(m["institut"].unique().tolist()),
+        "forsta": m["datum"].min().date().isoformat(),
+        "sista": m["datum"].max().date().isoformat(),
+        "lutning_per_manad": lutningar,
+        "obalanserad_summa": summa,
+        "matningar": m.sort_values("datum")[
+            ["institut", "datum"] + list(cfg.PARTIER)].to_dict("records"),
+    }
+    return normaliserad, info
 
 
 SCENARIER = [
@@ -58,26 +110,28 @@ SCENARIER = [
     Scenario(
         id="orebropartiet_valkrets",
         namn="Örebropartiet in via valkretsen",
-        fraga="Vad händer om Örebropartiet får tolv procent i Örebro län?",
+        fraga="Vad händer om Örebropartiet får femton procent i Örebro län?",
         beskrivning=(
             "Vallagen har två vägar till riksdagen: fyra procent i hela landet, "
             "eller tolv procent i en enskild valkrets. Den andra vägen har inte "
             "gett mandat sedan 1900-talet. Örebropartiet mäter starkt i "
             "kommunvalet, och scenariot prövar vad som händer om stödet håller "
-            "hela vägen upp till riksdagsvalet i Örebro län."
+            "hela vägen upp till riksdagsvalet i Örebro län. Femton procent "
+            "ligger klart över valkretsspärren och räcker till mer än ett "
+            "mandat."
         ),
         valkretsparti={
             "namn": "Örebropartiet",
             "kod": "ÖP",
             "valkrets": "Örebro län",
-            "andel_i_valkrets": 12.0,
+            "andel_i_valkrets": 15.0,
             "farg": "#7B3FA0",
         },
-        # Örebro län har tolv av 349 mandat, alltså 3,4 procent av riket. Tolv
-        # procent i länet motsvarar därför cirka 0,41 procentenheter
+        # Örebro län har tolv av 349 mandat, alltså 3,4 procent av riket.
+        # Femton procent i länet motsvarar därför cirka 0,52 procentenheter
         # nationellt, tagna från de partier som står starkast i länet.
-        forflyttning={"SD": -0.14, "S": -0.12, "M": -0.08, "KD": -0.03,
-                      "V": -0.02, "C": -0.01, "MP": -0.01},
+        forflyttning={"SD": -0.18, "S": -0.15, "M": -0.10, "KD": -0.04,
+                      "V": -0.02, "C": -0.02, "MP": -0.01},
         forbehall=(
             "Detta är scenariets mest osäkra antagande. Modellen skattar att "
             "ett lokalt parti behåller knappt en femtedel av sitt kommunstöd i "
@@ -85,9 +139,29 @@ SCENARIER = [
             "osannolikt. Örebropartiet mätte 18,4 procent i kommunvalet, vilket "
             "motsvarar omkring 3,5 procent i riksdagsvalet i länet. Rösterna "
             "antas komma främst från SD, S och M, och i mindre grad från "
-            "övriga partier. Tolv procent ger ett mandat, inte två: för ett "
-            "andra mandat hade det krävts omkring fjorton procent i "
-            "valkretsen."
+            "övriga partier."
+        ),
+    ),
+    Scenario(
+        id="sommartrend",
+        namn="Sommartrenden håller i sig",
+        fraga="Vad händer om sommarens rörelse fortsätter rakt fram till valdagen?",
+        beskrivning=(
+            "Demoskop och Novus mäter tätast och jämnast av instituten. "
+            "Scenariot lägger en rät linje genom deras mätningar från juni, "
+            "juli och augusti och förlänger den till valdagen. Det är ett "
+            "mekaniskt antagande: opinionen rör sig sällan linjärt, och de "
+            "sista veckorna före ett val brukar vara de mest rörliga. Men det "
+            "visar vart sommarens riktning pekar om ingenting bryter den."
+        ),
+        trend=True,
+        forbehall=(
+            "En rät linje genom sex mätningar är ett svagt underlag och tar "
+            "varken hänsyn till institutens husfaktorer eller till att "
+            "opinionen historiskt planar ut nära valdagen. Huvudprognosen "
+            "väger alla institut, korrigerar för husfaktorer och simulerar "
+            "utfallet, och är därför en bättre gissning om vad som faktiskt "
+            "händer. Trenden svarar bara på vad riktningen pekar mot."
         ),
     ),
 ]
@@ -166,12 +240,20 @@ def valkretsrakning(roster: dict[str, float], vp: dict) -> dict:
     }
 
 
-def kor(scenario: Scenario, baslinje: pd.Series) -> dict:
+def kor(scenario: Scenario, baslinje: pd.Series,
+        matningar: pd.DataFrame | None = None) -> dict:
     """Räknar ut ett scenarios utfall från prognosens viktade snitt."""
     bas = {p: float(baslinje[p]) for p in cfg.PARTIER}
-    nytt = dict(bas)
-    for parti, delta in scenario.forflyttning.items():
-        nytt[parti] = max(0.0, nytt.get(parti, 0.0) + delta)
+
+    if scenario.trend:
+        if matningar is None:
+            raise ValueError("Trendscenariot behöver mätningarna.")
+        nytt, info = trendforflyttning(matningar)
+        scenario.trenddata = info
+    else:
+        nytt = dict(bas)
+        for parti, delta in scenario.forflyttning.items():
+            nytt[parti] = max(0.0, nytt.get(parti, 0.0) + delta)
 
     mandat_bas = modell.fordela_mandat(bas)
     mandat_nytt, vk_mandat = _mandat_med_valkretsparti(nytt, scenario.valkretsparti)
@@ -218,5 +300,11 @@ def _koalitioner(mandat_bas: dict, mandat_nytt: dict,
     return sorted(rader, key=lambda r: -r["efter"])
 
 
-def kor_alla(baslinje: pd.Series) -> list[dict]:
-    return [kor(s, baslinje) for s in SCENARIER]
+def kor_alla(baslinje: pd.Series,
+             matningar: pd.DataFrame | None = None) -> list[dict]:
+    ut = []
+    for s in SCENARIER:
+        if s.trend and matningar is None:
+            continue
+        ut.append(kor(s, baslinje, matningar))
+    return ut

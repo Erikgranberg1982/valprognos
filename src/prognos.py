@@ -415,7 +415,7 @@ def main() -> None:
             print(f"  Partisidan kunde inte byggas: {fel}")
         try:
             import scenariosida
-            scenariosida.skriv(ROT / "output", res["snitt"], meta)
+            scenariosida.skriv(ROT / "output", res["snitt"], meta, df)
         except Exception as fel:
             print(f"  Scenariosidan kunde inte byggas: {fel}")
         print(f"Dashboard sparad: {ut}\n")

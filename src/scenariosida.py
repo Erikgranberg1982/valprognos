@@ -25,8 +25,8 @@ def _mandatstapel(mandat: dict, farger: dict) -> str:
     return "".join(bitar)
 
 
-def skriv(katalog: Path, baslinje, meta: dict) -> Path:
-    utfall = scenarier.kor_alla(baslinje)
+def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
+    utfall = scenarier.kor_alla(baslinje, matningar)
 
     farger = dict(cfg.PARTIFARG)
     for u in utfall:
@@ -56,6 +56,57 @@ def skriv(katalog: Path, baslinje, meta: dict) -> Path:
     return ut
 
 
+def _trendunderlag(u: dict, farger: dict) -> str:
+    """Visar de mätningar trendlinjen bygger på och lutningen per parti."""
+    info = u["scenario"].trenddata
+    if not info:
+        return ""
+
+    huvuden = "".join(f'<th class="ta">{p}</th>' for p in cfg.PARTIER)
+    rader = []
+    for r in info["matningar"]:
+        datum = r["datum"]
+        datum = datum.date().isoformat() if hasattr(datum, "date") else str(datum)[:10]
+        celler = "".join(f'<td class="ta">{r[p]:.1f}</td>' for p in cfg.PARTIER)
+        rader.append(f'<tr><td>{r["institut"]}</td><td class="ta">{datum}</td>'
+                     f'{celler}</tr>')
+
+    lut = info["lutning_per_manad"]
+    lutceller = []
+    for p in cfg.PARTIER:
+        v = lut[p]
+        kl = "upp" if v > 0.05 else ("ned" if v < -0.05 else "noll")
+        lutceller.append(f'<td class="ta {kl}">{v:+.2f}</td>')
+    rader.append(f'<tr class="lutrad"><td><strong>Per månad</strong></td>'
+                 f'<td class="ta">–</td>{"".join(lutceller)}</tr>')
+
+    slut = "".join(f'<td class="ta"><strong>{u["roster_nytt"][p]:.1f}</strong></td>'
+                   for p in cfg.PARTIER)
+    rader.append(f'<tr class="lutrad"><td><strong>Valdagen</strong></td>'
+                 f'<td class="ta">13 sep</td>{slut}</tr>')
+
+    return f'''
+  <h2>Underlaget</h2>
+  <div class="rub">Mätningarna trenden bygger på</div>
+  <div class="kort">
+    <p class="besk">{info["antal"]} mätningar från
+    {" och ".join(info["institut"])} mellan {info["forsta"]} och
+    {info["sista"]}. En rät linje läggs genom varje partis värden och
+    förlängs till valdagen.</p>
+    <div class="rulla">
+    <table class="tab">
+      <thead><tr><th>Institut</th><th class="ta">Datum</th>{huvuden}</tr></thead>
+      <tbody>{"".join(rader)}</tbody>
+    </table>
+    </div>
+    <p class="fot">Linjerna dras oberoende av varandra, så de summerar inte
+    till hundra. Rakt fram till valdagen ger summan
+    {info["obalanserad_summa"]:.1f} procent, som skalas om till hundra innan
+    mandaten fördelas. Demoskop publicerade ingen mätning i juli, vilket en
+    regression mot datum hanterar utan problem.</p>
+  </div>'''
+
+
 def _valkretsrakning(u: dict, farger: dict) -> str:
     """Visar mandatfördelningen inne i valkretsen, mandat för mandat."""
     vp = u["scenario"].valkretsparti
@@ -77,6 +128,18 @@ def _valkretsrakning(u: dict, farger: dict) -> str:
 
     behovs = vr["behovs_for_nasta"]
     nasta = vr["vunna"] + 1
+    egna = [(i, x["kvot"]) for i, x in enumerate(vr["steg"], 1)
+            if x["parti"] == kod]
+    nummer = ", ".join(str(i) for i, _ in egna[:-1])
+    nummer = f"{nummer} och {egna[-1][0]}" if len(egna) > 1 else str(egna[0][0])
+    forsta_kvot = egna[0][1]
+    fler = (f" respektive {egna[-1][1]:.2f}" if len(egna) > 1 else "")
+    ORD = {1: "ett", 2: "två", 3: "tre", 4: "fyra", 5: "fem", 6: "sex",
+           12: "tolv", 14: "fjorton", 15: "femton", 18: "arton", 24: "tjugofyra"}
+    andel = int(round(vp["andel_i_valkrets"]))
+    slutsats = (f'{ORD.get(andel, andel)} procent räcker alltså till '
+                f'{ORD.get(vr["vunna"], vr["vunna"])} mandat, inte '
+                f'{ORD.get(nasta, nasta)}.').capitalize()
     return f'''
   <h2>Räkningen i valkretsen</h2>
   <div class="rub">Varför {namn} får {vr["vunna"]} mandat</div>
@@ -88,14 +151,12 @@ def _valkretsrakning(u: dict, farger: dict) -> str:
     riksdagspartierna på de återstående
     {100 - vp["andel_i_valkrets"]:.0f} procenten.</p>
     <div class="mrutor">{"".join(rutor)}</div>
-    <p class="fot">{namn} tar mandat nummer
-    {next(i for i, x in enumerate(vr["steg"], 1) if x["parti"] == kod)} med
-    kvoten {vr["kvot_for_nasta"] * 3:.2f}. För ett {nasta}:a mandat skulle
-    kvoten behöva slå {vr["sista_kvot"]:.2f}, alltså den sista som gav mandat.
-    Med {vr["vunna"]} mandat blir nästa divisor {2 * vr["vunna"] + 1}, så det
-    hade krävt <em>{behovs:.0f} procent</em> i valkretsen i stället för
-    {vp["andel_i_valkrets"]:.0f}. Tolv procent räcker till ett mandat, inte
-    två.</p>
+    <p class="fot">{namn} tar mandat {nummer} med kvoten
+    {forsta_kvot:.2f}{fler}. För ett {nasta}:e mandat skulle kvoten behöva slå
+    {vr["sista_kvot"]:.2f}, alltså den sista som gav mandat. Med
+    {vr["vunna"]} mandat blir nästa divisor {2 * vr["vunna"] + 1}, så det hade
+    krävt <em>{behovs:.0f} procent</em> i valkretsen i stället för
+    {vp["andel_i_valkrets"]:.0f}. {slutsats}</p>
   </div>'''
 
 
@@ -157,6 +218,8 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
                           "Mandaten flyttar sig, men majoritetsbilden står kvar.")
 
     vr_html = _valkretsrakning(u, farger) if s.valkretsparti else ""
+    if s.trend:
+        vr_html = _trendunderlag(u, farger)
 
     return f'''
 <section class="spanel" id="s-{s.id}"{' hidden' if dold else ''}>
@@ -286,6 +349,8 @@ border:1.5px solid transparent}}
 .mpil{{width:8px;height:8px;border-radius:2px;flex:none}}
 .mp{{font-weight:700}}
 .mkv{{color:var(--svag);font-variant-numeric:tabular-nums;font-size:11px}}
+.rulla{{overflow-x:auto}}
+.lutrad td{{border-top:2px solid var(--linje);background:var(--panel)}}
 .varn{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
 gap:13px;margin-top:22px}}
 .vk{{background:var(--panel);border-radius:12px;padding:16px 18px}}

@@ -1461,7 +1461,7 @@ footer strong {{ color:var(--text); }}
   </a>
   <a class="fkort" href="scenarier_2026.html">
     <div class="ftitel">Scenarier {_pil()}</div>
-    <div class="ftext">Om L klarar spärren, om ett lokalt parti tar en valkrets</div>
+    <div class="ftext">Om L klarar spärren, om sommartrenden håller, om ett lokalt parti tar en valkrets</div>
   </a>
 </div>
 <h2>Prognos</h2>
