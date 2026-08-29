@@ -185,6 +185,41 @@ def _hemvalkrets_tabell() -> dict[str, str]:
     return ut
 
 
+
+# Hur många riksdagslistor varje kandidat står på. Regeln om historisk
+# valkrets och hemvalkrets gäller bara den som står på flera listor: den som
+# bara står på en har ingen valfrihet, och ska följa listordningen.
+_LISTOR_PER_KANDIDAT: dict[tuple[str, str], int] | None = None
+
+# Från och med så här många listor räknas kandidaten som rikstäckande.
+FLERLISTEGRANS = 2
+
+
+def _listor_per_kandidat() -> dict[tuple[str, str], int]:
+    global _LISTOR_PER_KANDIDAT
+    if _LISTOR_PER_KANDIDAT is not None:
+        return _LISTOR_PER_KANDIDAT
+    ut: dict[tuple[str, str], int] = {}
+    try:
+        k = las_kandidaturer()
+        rd = k[k["valtyp"].eq("RD")]
+        if "giltig" in rd.columns:
+            rd = rd[rd["giltig"]]
+        for _, rad in rd.iterrows():
+            nyckel = (str(rad.get("parti") or ""), _norm(rad.get("namn")))
+            if nyckel[0] and nyckel[1]:
+                ut[nyckel] = ut.get(nyckel, 0) + 1
+    except Exception:
+        pass
+    _LISTOR_PER_KANDIDAT = ut
+    return ut
+
+
+def star_pa_flera_listor(parti: str, namn: object) -> bool:
+    """Om kandidaten står på flera riksdagslistor och alltså kan placeras."""
+    return _listor_per_kandidat().get(
+        (str(parti), _norm(namn)), 1) >= FLERLISTEGRANS
+
 def hemvalkrets_for_kandidat(folkbokforingskommun: object) -> str:
     """Riksdagsvalkretsen som kandidatens hemkommun tillhör.
 
@@ -986,13 +1021,22 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
             har_namn = str(valkretsnamn or "")
 
             def _prio(rad):
+                """Ordningen kandidaterna prövas i för valkretsens mandat.
+
+                Bara den som står på flera listor placeras om. Den som står på
+                en enda lista har ingen valfrihet och behåller sin plats i
+                listordningen, oavsett var hen bor eller satt förra gången.
+                """
+                if not star_pa_flera_listor(parti, rad.get("namn")):
+                    return 2
+
                 if rad["historisk_valkrets_2022"] == har_kod:
-                    return 0
+                    return 0  # satt i valkretsen 2022
                 if rad["hemvalkrets_2026"] and rad["hemvalkrets_2026"] == har_namn:
-                    return 1
+                    return 1  # bor i valkretsen
                 if rad["historisk_valkrets_2022"] or rad["hemvalkrets_2026"]:
-                    return 3  # hör hemma någon annanstans
-                return 2
+                    return 3  # hör hemma någon annanstans, prövas sist
+                return 2      # ingen känd hemvist, följer listordningen
 
             kandidater["historisk_prio"] = kandidater.apply(_prio, axis=1)
             kandidater = kandidater.sort_values(
