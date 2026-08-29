@@ -21,7 +21,7 @@ METOD = {
     "listordning": ("", "sakert"),
     "historisk_valkrets_2022": ("Står på flera listor", "medel"),
     "hemvalkrets_2026": ("Står på flera listor", "medel"),
-    "dubbelvalsavveckling": ("Efter omfördelning", "medel"),
+    "dubbelvalsavveckling": ("Ärvde ledig plats", "medel"),
 }
 
 

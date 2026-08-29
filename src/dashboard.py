@@ -1459,6 +1459,10 @@ footer strong {{ color:var(--text); }}
     <div class="ftitel">Alla ledamöter {_pil()}</div>
     <div class="ftext">Samtliga 346 prognosticerade riksdagsledamöter</div>
   </a>
+  <a class="fkort" href="scenarier_2026.html">
+    <div class="ftitel">Scenarier {_pil()}</div>
+    <div class="ftext">Om L klarar spärren, om ett lokalt parti tar en valkrets</div>
+  </a>
 </div>
 <h2>Prognos</h2>
 <div class="sektionsrubrik">Så skulle riksdagen se ut</div>

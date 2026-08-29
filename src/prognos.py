@@ -411,8 +411,13 @@ def main() -> None:
         try:
             import partisida
             partisida.skriv(ROT / "output", res["sammanfattning"], trend, meta)
-        except Exception:
-            pass
+        except Exception as fel:
+            print(f"  Partisidan kunde inte byggas: {fel}")
+        try:
+            import scenariosida
+            scenariosida.skriv(ROT / "output", res["snitt"], meta)
+        except Exception as fel:
+            print(f"  Scenariosidan kunde inte byggas: {fel}")
         print(f"Dashboard sparad: {ut}\n")
 
 

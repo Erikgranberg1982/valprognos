@@ -135,6 +135,18 @@ def main() -> None:
             fel(f"kandidater.json innehåller bara {antal} områden. Kontrollera "
                 "att källfilerna finns i data/kandidater.")
 
+    # Undersidorna byggs i ett eget steg som fångar undantag, så ett fel där
+    # ger en startsida med länkar som leder till ingenting.
+    for namn, minsta in (("partier_2026.html", 20),
+                         ("ledamoter_2026.html", 20),
+                         ("scenarier_2026.html", 10)):
+        sida = ROT / "output" / namn
+        if not sida.exists():
+            fel(f"{namn} saknas. Undersidan byggdes inte.")
+        kb = sida.stat().st_size / 1024
+        if kb < minsta:
+            fel(f"{namn} är bara {kb:.0f} kB, väntat minst {minsta} kB.")
+
     print(f"Kontroll godkänd: {len(df)} mätningar från {institut} institut, "
           f"senaste {df['datum'].max().date()}.")
     print(f"  Prognos: " + ", ".join(f"{p} {snitt[p]:.1f}" for p in PARTIER))

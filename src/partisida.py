@@ -22,7 +22,7 @@ METOD = {
     "listordning": ("", "sakert"),
     "historisk_valkrets_2022": ("Står på flera listor", "medel"),
     "hemvalkrets_2026": ("Står på flera listor", "medel"),
-    "dubbelvalsavveckling": ("Efter omfördelning", "medel"),
+    "dubbelvalsavveckling": ("Ärvde ledig plats", "medel"),
 }
 
 
@@ -242,8 +242,11 @@ border-radius:99px;background:var(--panel);transition:.15s}}
     <p>De flesta kandidater står på en enda lista och tar platsen i
     listordning, vilket inte märks ut. <em>Står på flera listor</em> betyder
     att kandidaten kan väljas i flera valkretsar och att modellen placerat
-    hen. <em>Efter omfördelning</em> betyder att någon högre upp tog sitt
-    mandat i en annan valkrets och platsen gick vidare.</p></div>
+    hen. <em>Ärvde ledig plats</em> betyder att någon högre upp på listan tog
+    sitt mandat i en annan valkrets, varpå platsen gick vidare nedåt. Det är
+    vallagens dubbelvalsavveckling: en partiledare kan stå etta på trettio
+    listor men bara ta ett mandat, och de övriga tjugonio platserna ärvs av
+    nästa namn.</p></div>
 
     <div class="vk"><div class="vrub">Träffsäkerhet</div>
     <p>Ett test mot 2022 ger rätt valkrets för 96 procent av de sittande

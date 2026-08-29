@@ -122,7 +122,8 @@ GitHub Pages uppdateras av sig självt. Din egen server gör det inte.
 cd "/Users/erikgranberg/Desktop/Python/Election prediction/src"
 python3 prognos.py --hamta
 cp ../output/index.html ../output/partier_2026.html \
-   ../output/ledamoter_2026.html ../output/*.json ../output/*.csv ../publicering/
+   ../output/ledamoter_2026.html ../output/scenarier_2026.html \
+   ../output/*.json ../output/*.csv ../publicering/
 ```
 
 Ladda sedan upp innehållet i `publicering/` till `/valprognos/` på servern.
