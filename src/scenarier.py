@@ -85,7 +85,9 @@ SCENARIER = [
             "osannolikt. Örebropartiet mätte 18,4 procent i kommunvalet, vilket "
             "motsvarar omkring 3,5 procent i riksdagsvalet i länet. Rösterna "
             "antas komma främst från SD, S och M, och i mindre grad från "
-            "övriga partier."
+            "övriga partier. Tolv procent ger ett mandat, inte två: för ett "
+            "andra mandat hade det krävts omkring fjorton procent i "
+            "valkretsen."
         ),
     ),
 ]
@@ -102,16 +104,66 @@ def _mandat_med_valkretsparti(roster: dict[str, float], vp: dict | None) -> tupl
         return modell.fordela_mandat(roster), 0
 
     platser = VALKRETSMANDAT.get(vp["valkrets"], 12)
+
     # Inom valkretsen fördelas mandaten mellan riksdagspartierna och det
-    # lokala partiet med samma metod som i riket.
-    i_valkrets = {p: roster.get(p, 0.0) for p in cfg.PARTIER}
-    i_valkrets[vp["kod"]] = vp["andel_i_valkrets"]
+    # lokala partiet med samma metod som i riket. Det lokala partiets andel
+    # tas ur valkretsen, så övriga partier måste skalas ned till det som blir
+    # kvar. Utan normaliseringen summerar andelarna till över hundra procent
+    # och det lokala partiet får för lite vikt i fördelningen.
+    andel = vp["andel_i_valkrets"]
+    riks = {p: roster.get(p, 0.0) for p in cfg.PARTIER}
+    summa = sum(riks.values())
+    skala = (100.0 - andel) / summa if summa else 0.0
+    i_valkrets = {p: v * skala for p, v in riks.items()}
+    i_valkrets[vp["kod"]] = andel
     lokalt = modell.fordela_mandat(i_valkrets, platser)
     vunna = lokalt.get(vp["kod"], 0)
 
     ovriga = modell.fordela_mandat(roster, cfg.MANDAT_TOTALT - vunna)
     ovriga[vp["kod"]] = vunna
     return ovriga, vunna
+
+
+def valkretsrakning(roster: dict[str, float], vp: dict) -> dict:
+    """Steg för steg-räkning av mandaten i valkretsen.
+
+    Gör det möjligt att kontrollera varför det lokala partiet får just det
+    antal mandat det får, och hur nära nästa mandat det ligger.
+    """
+    platser = VALKRETSMANDAT.get(vp["valkrets"], 12)
+    andel = vp["andel_i_valkrets"]
+    riks = {p: roster.get(p, 0.0) for p in cfg.PARTIER}
+    summa = sum(riks.values())
+    skala = (100.0 - andel) / summa if summa else 0.0
+    andelar = {p: v * skala for p, v in riks.items()}
+    andelar[vp["kod"]] = andel
+
+    mandat = {p: 0 for p in andelar}
+    divisorer = {p: 1.2 for p in andelar}
+    steg = []
+    for _ in range(platser):
+        vinnare = max(andelar, key=lambda p: andelar[p] / divisorer[p])
+        kvot = andelar[vinnare] / divisorer[vinnare]
+        mandat[vinnare] += 1
+        divisorer[vinnare] = 2 * mandat[vinnare] + 1
+        steg.append({"parti": vinnare, "kvot": kvot})
+
+    # Vad hade krävts för ett mandat till? Nästa kvot för partiet måste
+    # överstiga den sista vinnande kvoten.
+    sista = steg[-1]["kvot"]
+    nasta_divisor = 2 * mandat[vp["kod"]] + 1
+    behovs = sista * nasta_divisor
+
+    return {
+        "platser": platser,
+        "andelar": andelar,
+        "mandat": mandat,
+        "steg": steg,
+        "vunna": mandat[vp["kod"]],
+        "sista_kvot": sista,
+        "kvot_for_nasta": andel / nasta_divisor,
+        "behovs_for_nasta": behovs,
+    }
 
 
 def kor(scenario: Scenario, baslinje: pd.Series) -> dict:

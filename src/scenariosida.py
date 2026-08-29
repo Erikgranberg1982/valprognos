@@ -56,6 +56,49 @@ def skriv(katalog: Path, baslinje, meta: dict) -> Path:
     return ut
 
 
+def _valkretsrakning(u: dict, farger: dict) -> str:
+    """Visar mandatfördelningen inne i valkretsen, mandat för mandat."""
+    vp = u["scenario"].valkretsparti
+    vr = scenarier.valkretsrakning(u["roster_nytt"], vp)
+    kod, namn = vp["kod"], vp["namn"]
+
+    rutor = []
+    for i, steg in enumerate(vr["steg"], 1):
+        p = steg["parti"]
+        egen = " egen" if p == kod else ""
+        etikett = namn if p == kod else p
+        rutor.append(
+            f'<div class="mruta{egen}" data-tip="Mandat {i} till {etikett}, '
+            f'kvot {steg["kvot"]:.2f}">'
+            f'<span class="mnr">{i}</span>'
+            f'<span class="mpil" style="background:{farger.get(p, "#7B3FA0")}"></span>'
+            f'<span class="mp">{etikett if p == kod else p}</span>'
+            f'<span class="mkv">{steg["kvot"]:.2f}</span></div>')
+
+    behovs = vr["behovs_for_nasta"]
+    nasta = vr["vunna"] + 1
+    return f'''
+  <h2>Räkningen i valkretsen</h2>
+  <div class="rub">Varför {namn} får {vr["vunna"]} mandat</div>
+  <div class="kort">
+    <p class="besk">Örebro län har {vr["platser"]} fasta mandat. De fördelas
+    med jämkade uddatalsmetoden: varje partis röstandel delas med 1,2, sedan
+    3, 5, 7 och så vidare, och mandatet går till den högsta kvoten. Eftersom
+    {namn} tar {vp["andel_i_valkrets"]:.0f} procent av rösterna delar
+    riksdagspartierna på de återstående
+    {100 - vp["andel_i_valkrets"]:.0f} procenten.</p>
+    <div class="mrutor">{"".join(rutor)}</div>
+    <p class="fot">{namn} tar mandat nummer
+    {next(i for i, x in enumerate(vr["steg"], 1) if x["parti"] == kod)} med
+    kvoten {vr["kvot_for_nasta"] * 3:.2f}. För ett {nasta}:a mandat skulle
+    kvoten behöva slå {vr["sista_kvot"]:.2f}, alltså den sista som gav mandat.
+    Med {vr["vunna"]} mandat blir nästa divisor {2 * vr["vunna"] + 1}, så det
+    hade krävt <em>{behovs:.0f} procent</em> i valkretsen i stället för
+    {vp["andel_i_valkrets"]:.0f}. Tolv procent räcker till ett mandat, inte
+    två.</p>
+  </div>'''
+
+
 def _panel(u: dict, farger: dict, dold: bool) -> str:
     s = u["scenario"]
     bas, nytt = u["mandat_bas"], u["mandat_nytt"]
@@ -101,7 +144,6 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
             f'<td class="ta">{k["efter"]} <span class="maj">{maj_e}</span></td>'
             f'<td class="ta {kl}">{d:+d}</td></tr>')
 
-    vinnare = max(u["koalitioner"], key=lambda k: k["efter"])
     byten = [k for k in u["koalitioner"] if k["majoritet_fore"] != k["majoritet_efter"]]
     if byten:
         sammanfattning = (
@@ -113,6 +155,8 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
     else:
         sammanfattning = ("Inget regeringsalternativ byter läge. "
                           "Mandaten flyttar sig, men majoritetsbilden står kvar.")
+
+    vr_html = _valkretsrakning(u, farger) if s.valkretsparti else ""
 
     return f'''
 <section class="spanel" id="s-{s.id}"{' hidden' if dold else ''}>
@@ -140,6 +184,8 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
     och alla andra späds ut. Mandaten summerar alltid till
     {cfg.MANDAT_TOTALT}.</p>
   </div>
+
+  {vr_html}
 
   <h2>Följden</h2>
   <div class="rub">Vad det gör med regeringsunderlagen</div>
@@ -231,6 +277,15 @@ margin-right:8px;vertical-align:baseline}}
 .fot{{margin:14px 0 0;font-size:12px;color:var(--svag);line-height:1.6}}
 .fot em{{font-style:normal;font-weight:700;color:var(--text)}}
 .of{{font-size:11px;color:var(--svag);font-weight:600}}
+.mrutor{{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}}
+.mruta{{display:flex;align-items:center;gap:6px;background:var(--panel);
+border-radius:9px;padding:7px 11px 7px 8px;font-size:12px;cursor:help;
+border:1.5px solid transparent}}
+.mruta.egen{{border-color:#7B3FA0;background:var(--kort)}}
+.mnr{{font-size:10px;font-weight:800;color:var(--svag);min-width:13px}}
+.mpil{{width:8px;height:8px;border-radius:2px;flex:none}}
+.mp{{font-weight:700}}
+.mkv{{color:var(--svag);font-variant-numeric:tabular-nums;font-size:11px}}
 .varn{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
 gap:13px;margin-top:22px}}
 .vk{{background:var(--panel);border-radius:12px;padding:16px 18px}}
