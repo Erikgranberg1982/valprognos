@@ -401,6 +401,18 @@ def main() -> None:
         except Exception:
             pass
         ut = dashboard.spara(html, kommun_json, kandidat_json)
+
+        # Fristående sidor: lista över ledamöterna och en sida per parti.
+        try:
+            import ledamotslista
+            ledamotslista.skriv(ROT / "output")
+        except Exception:
+            pass
+        try:
+            import partisida
+            partisida.skriv(ROT / "output", res["sammanfattning"], trend, meta)
+        except Exception:
+            pass
         print(f"Dashboard sparad: {ut}\n")
 
 

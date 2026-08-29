@@ -109,17 +109,24 @@ def per_omrade(niva: str) -> dict:
         metod = str(grupp["listval_metod"].iloc[0])
         varning = grupp["listval_varning"].dropna()
 
-        # Kandidaterna lagras som "Namn|ålder|ort" i stället för objekt, vilket
-        # tar bort fältnamn som annars upprepas för varje av tolvtusen rader.
-        # Orten utelämnas när den är samma som områdets, vilket den oftast är.
+        # Kandidaterna lagras som "Namn|valsedelsuppgift" i stället för objekt,
+        # vilket tar bort fältnamn som annars upprepas för varje av tolvtusen
+        # rader. Valsedelsuppgiften är den text partiet tryckt på valsedeln och
+        # innehåller ålder, ort och titel, exempelvis "44, Nacka,
+        # Riksdagsledamot". Saknas den byggs motsvarande text av ålder och ort.
         namn = []
         for _, rad in grupp.iterrows():
-            alder = rad.get("alder_pa_valdagen")
-            alderstext = str(int(float(alder))) if pd.notna(alder) else ""
-            ort = str(rad.get("folkbokforingskommun") or "")
-            if ort == str(grupp["omrade_namn"].iloc[0]):
-                ort = ""
-            namn.append(f"{rad['namn']}|{alderstext}|{ort}".rstrip("|"))
+            uppgift = str(rad.get("valsedelsuppgift") or "").strip()
+            if not uppgift or uppgift == "nan":
+                alder = rad.get("alder_pa_valdagen")
+                delar = []
+                if pd.notna(alder) and str(alder).strip():
+                    delar.append(str(int(float(alder))))
+                ort = str(rad.get("folkbokforingskommun") or "").strip()
+                if ort and ort != "nan":
+                    delar.append(ort)
+                uppgift = ", ".join(delar)
+            namn.append(f"{rad['namn']}|{uppgift}".rstrip("|"))
 
         try:
             mandat = int(float(grupp["prognosmandat_parti"].iloc[0]))

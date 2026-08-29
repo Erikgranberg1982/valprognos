@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import gzip
 import json
+from html import escape as html_escape
 from pathlib import Path
 
 import pandas as pd
@@ -83,6 +84,36 @@ def _pil() -> str:
 KAMMARORDNING = ["V", "S", "MP", "C", "L", "KD", "M", "SD"]
 
 
+def _riksdagsledamoter() -> dict[str, list[str]]:
+    """Ledamöterna per parti, i den ordning de tar plats i kammaren.
+
+    Används för att sätta namn på varje punkt i kammargrafiken, så att den som
+    hovrar ser vem platsen tillhör och inte bara vilket parti.
+    """
+    for fil in (ROT / "output" / "kandidatprognos_riksdag.csv",
+                ROT / "data" / "kandidater" / "kandidatprognos_riksdag.csv.gz"):
+        if not fil.exists():
+            continue
+        try:
+            df = pd.read_csv(fil, dtype=str)
+        except Exception:
+            continue
+        ut: dict[str, list[str]] = {}
+        for parti, grupp in df.groupby("parti"):
+            grupp = grupp.copy()
+            grupp["ord"] = pd.to_numeric(grupp["ordning"], errors="coerce")
+            rader = []
+            for _, r in grupp.sort_values(["valkretsnamn", "ord"]).iterrows():
+                uppgift = str(r.get("valsedelsuppgift") or "").strip()
+                if uppgift == "nan":
+                    uppgift = ""
+                rader.append(f'{r["namn"]}\n{uppgift}\n{r["valkretsnamn"]}'
+                             .replace("\n\n", "\n"))
+            ut[str(parti)] = rader
+        return ut
+    return {}
+
+
 def _kammare(mandat: dict[str, int], vansterblock: int) -> str:
     """Ritar riksdagskammaren som en halvcirkel med en punkt per mandat.
 
@@ -100,10 +131,23 @@ def _kammare(mandat: dict[str, int], vansterblock: int) -> str:
     # Eventuella tomma platser om summan avviker.
     sekvens.extend([None] * (len(platser) - len(sekvens)))
 
+    # Namnen på ledamöterna, så att varje punkt kan berätta vem den tillhör.
+    ledamoter = _riksdagsledamoter()
+    raknare: dict[str, int] = {}
+
     prickar = []
     for plats, parti in zip(platser, sekvens):
         farg = cfg.PARTIFARG.get(parti, "#D5DCE6") if parti else "#D5DCE6"
-        titel = f"<title>{parti}</title>" if parti else ""
+        titel = ""
+        if parti:
+            i = raknare.get(parti, 0)
+            raknare[parti] = i + 1
+            namn = ledamoter.get(parti, [])
+            if i < len(namn):
+                text = html_escape(namn[i])
+                titel = f"<title>{text}</title>"
+            else:
+                titel = f"<title>{parti}</title>"
         prickar.append(
             f'<circle cx="{plats["x"]:.4f}" cy="{plats["y"]:.4f}" r="0.042" '
             f'fill="{farg}" class="plats">{titel}</circle>'
@@ -1020,7 +1064,14 @@ canvas {{ width:100%; height:auto; display:block; }}
 .grafkort {{ background:var(--kortbg); border:1px solid var(--linje);
   border-radius:16px; padding:20px; box-shadow:var(--skugga); }}
 .nivaval {{ display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 8px;
-  padding-bottom:14px; border-bottom:1px solid var(--linje); }}
+  padding-bottom:14px; border-bottom:1px solid var(--linje); align-items:center; }}
+/* Länkar till de fristående sidorna, avskilda från nivåväxlarna. */
+.sidolank {{ display:inline-flex; align-items:center; gap:6px; font-size:13px;
+  font-weight:600; color:var(--korall); text-decoration:none; padding:7px 14px;
+  border-radius:28px; }}
+.sidolank:first-of-type {{ margin-left:auto; }}
+.sidolank:hover {{ background:var(--korall-ljus); }}
+.sidolank .pil {{ width:13px; height:13px; }}
 .nivaknapp {{ background:transparent; color:var(--korall); font:inherit;
   font-size:13.5px; font-weight:600; border:1.5px solid var(--korall);
   border-radius:28px; padding:8px 19px; cursor:pointer; transition:all .15s; }}
@@ -1371,6 +1422,8 @@ footer strong {{ color:var(--text); }}
   <button class="nivaknapp aktiv" data-niva="riksdag">Riksdagsval</button>
   <button class="nivaknapp" data-niva="region">Regionval</button>
   <button class="nivaknapp" data-niva="kommun">Kommunval</button>
+  <a class="sidolank" href="partier_2026.html">Parti för parti {_pil()}</a>
+  <a class="sidolank" href="ledamoter_2026.html">Alla ledamöter {_pil()}</a>
 </div>
 
 <div id="riksdagsvy">
@@ -1831,14 +1884,32 @@ const LOKAL = {lokal_json};
     const bandordning = KAMMARORDNING.filter(function(p) {{
       return (post.mandat[p] || 0) > 0;
     }});
+    /* Namnen på dem som tar mandaten, om kandidatdatan hunnit hämtas.
+       Bandet visar dem i tooltipen så att den som hovrar ser vilka platserna
+       tillhör, inte bara hur många partiet har. */
+    function bandnamn(parti, antal) {{
+      const omr = KAND && KAND[niva] && KAND[niva][post.kod];
+      if (!omr) return '';
+      const pp = (omr.partier || []).filter(function(x) {{ return x.p === parti; }})[0];
+      if (!pp || !pp.k) return '';
+      return '\n' + pp.k.slice(0, antal).map(function(t, i) {{
+        return (i + 1) + '. ' + kandidatnamn(t).namn;
+      }}).join('\n');
+    }}
+
     let band = bandordning.map(function(p) {{
-      const andel = (post.mandat[p] || 0) / tot * 100;
-      return '<div class="bandbit" title="' + p + ' ' + post.mandat[p] +
+      const antal = post.mandat[p] || 0;
+      const andel = antal / tot * 100;
+      const titel = p + ': ' + antal + (antal === 1 ? ' mandat' : ' mandat') +
+                    bandnamn(p, antal);
+      return '<div class="bandbit" title="' + titel.replace(/"/g, '&quot;') +
         '" style="width:' + andel.toFixed(2) + '%;background:' + FARG[p] + '"></div>';
     }}).join('');
     if (post.lokal && post.lokal.mandat) {{
-      band += '<div class="bandbit" title="' + post.lokal.namn + ' ' +
-        post.lokal.mandat + '" style="width:' +
+      const ltitel = (post.lokal.namn + ': ' + post.lokal.mandat + ' mandat' +
+                      bandnamn(post.lokal.namn, post.lokal.mandat));
+      band += '<div class="bandbit" title="' + ltitel.replace(/"/g, '&quot;') +
+        '" style="width:' +
         (post.lokal.mandat / tot * 100).toFixed(2) + '%;background:' +
         LOKALFARG + '"></div>';
     }}
@@ -2067,9 +2138,10 @@ const LOKAL = {lokal_json};
   }}
 
   function kandidatnamn(text) {{
-    /* Lagrade som "Namn|ålder|ort", där ålder och ort kan saknas. */
+    /* Lagrade som "Namn|valsedelsuppgift", där uppgiften är den text partiet
+       tryckt på valsedeln: ålder, ort och titel. */
     const delar = String(text).split('|');
-    return {{ namn: delar[0], alder: delar[1] || '', ort: delar[2] || '' }};
+    return {{ namn: delar[0], uppgift: delar[1] || '' }};
   }}
 
   function ritaKandidater(post) {{
@@ -2111,9 +2183,8 @@ const LOKAL = {lokal_json};
            trettio mandat inte blir en trettio rader lång lista. */
         const brickor = p.k.slice(0, p.m).map(function(text, i) {{
           const k = kandidatnamn(text);
-          const titel = k.namn + (k.alder ? ', ' + k.alder + ' år' : '') +
-                        (k.ort ? ', ' + k.ort : '') +
-                        ' — plats ' + (i + 1) + ' för ' + p.p;
+          const titel = k.namn + (k.uppgift ? '\n' + k.uppgift : '') +
+                        '\nPlats ' + (i + 1) + ' av ' + p.m + ' för ' + p.p;
           return '<span class="kandbricka" title="' +
                  titel.replace(/"/g, '&quot;') + '">' +
                  '<span class="kandnr">' + (i + 1) + '</span>' + k.namn +
