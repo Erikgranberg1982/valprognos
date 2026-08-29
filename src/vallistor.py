@@ -878,19 +878,57 @@ def _rd_valkretsar(index: VallisteIndex, omrade: str | None = None) -> pd.DataFr
 
 
 def _rd_listor_i_valkrets(listor: pd.DataFrame, valkretsnamn: str) -> pd.DataFrame:
+    """Listorna som ett parti ställer upp med i en riksdagsvalkrets.
+
+    En lista kan heta som valkretsen, som länet, eller HELA LANDET. Skåne,
+    Stockholm och Västra Götaland är delade i flera valkretsar, och där kan
+    partiet ha en gemensam länslista: Kristdemokraterna har en lista kallad
+    Skåne län som gäller i alla fyra skånska valkretsar.
+
+    Matchningen görs därför i tre steg: exakt valkretsnamn, sedan länslista,
+    sedan HELA LANDET. Enbart en delsträngsjämförelse räcker inte, eftersom
+    Skåne län inte innehåller Skåne läns södra utan tvärtom.
+    """
     if listor.empty:
         return listor
+
     namn = _norm(valkretsnamn)
     beteckning = listor["listbeteckning"].map(_norm)
     hela = beteckning.eq("hela landet")
-    match = beteckning.eq(namn) | beteckning.str.contains(namn, regex=False)
-    lokala = listor[match & ~hela]
+
+    # Länets namn: Skåne läns södra -> skane lan
+    lan = namn
+    for suffix in (" läns södra", " läns västra", " läns norra och östra",
+                   " läns norra", " läns östra", " läns"):
+        if lan.endswith(suffix):
+            lan = lan[: -len(suffix)] + " län"
+            break
+
+    exakt = listor[beteckning.eq(namn) & ~hela]
+    if not exakt.empty:
+        return exakt
+
+    # Länslista som täcker flera valkretsar, eller namn som innehåller
+    # valkretsens namn. Den väljs framför HELA LANDET även när den senare har
+    # större upplaga, eftersom en lista med länets namn är den partiet
+    # kampanjar med lokalt. Vilken väljarna faktiskt använder går inte att veta
+    # före valet, så valet markeras som osäkert.
+    lansmatch = (beteckning.eq(lan) | beteckning.str.contains(namn, regex=False))
+    lokala = listor[lansmatch & ~hela]
     if not lokala.empty:
+        if hela.any():
+            lokala = lokala.copy()
+            lokala["listval_notis"] = (
+                "Partiet har både en lista för länet och en för hela landet. "
+                "Länslistan används, eftersom den är den partiet kampanjar med "
+                "lokalt, men vilken väljarna faktiskt lägger går inte att veta "
+                "före valet.")
         return lokala
+
     hela_listor = listor[hela]
     if not hela_listor.empty:
         return hela_listor
-    return listor[match] if match.any() else listor
+    return listor
 
 
 def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
@@ -999,6 +1037,9 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
         if mandat <= 0 or listnummer not in listor.index:
             continue
         lista = listor.loc[listnummer]
+        notis = str(lista.get("listval_notis") or "").strip()
+        if notis and not listval_varning:
+            listval_varning = notis
         parti_label = str(lista["partiforkortning"] or lista["partibeteckning"])
         kandidater = index.kandidater_for_lista(
             valtyp, valomradeskod, lista["partinyckel"], listnummer)
