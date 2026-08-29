@@ -5,6 +5,10 @@ FiveThirtyEight: opinionsmätningar viktas efter kvalitet, urval och färskhet,
 justeras för institutens husfaktorer och körs genom en Monte Carlo-simulering
 som ger sannolikheter för block och regeringsalternativ.
 
+> **Ny mätning ute?** Oftast behöver du inte göra något: bygget hämtar och
+> publicerar automatiskt varje natt. Se [UPPDATERA.md](UPPDATERA.md) för de
+> fall där du behöver ingripa.
+
 ## Kom igång
 
 ```bash
@@ -366,6 +370,10 @@ Alla parametrar ligger i CSV-filer och kan ändras utan kodändring:
   antal simuleringar. Sänk `halveringstid_dagar` för att låta nya mätningar
   väga tyngre.
 - **`data/valdagskorrigering.csv`** — historisk skevhet per parti.
+- **`data/egna_matningar.csv`** — riksmätningar som saknas på Wikipedia. Läggs
+  ovanpå de skrapade och överlever nästa hämtning.
+
+Se [UPPDATERA.md](UPPDATERA.md) för hela rutinen kring nya mätningar.
 
 ## Regeringsalternativ
 

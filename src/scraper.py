@@ -257,7 +257,73 @@ def skrapa(valar: int = 2026) -> pd.DataFrame:
     df = pd.DataFrame(rader)
     df = df.drop_duplicates(subset=["institut", "datum"] + PARTIER)
     df = df.sort_values("datum", ascending=False).reset_index(drop=True)
+    if valar == 2026:
+        df = slask_ihop(df)
     return df
+
+
+def egna_matningar() -> pd.DataFrame:
+    """Läser mätningar som lagts in för hand i data/egna_matningar.csv.
+
+    Wikipedia ligger ibland några dagar efter, och en mätning som bara
+    publicerats i en tidning finns inte där alls. Sådana rader skrivs annars
+    över nästa gång skrapningen kör, eftersom spara() ersätter hela filen.
+    """
+    fil = ROT / "data" / "egna_matningar.csv"
+    if not fil.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(fil)
+    if df.empty:
+        return df
+
+    saknas = [k for k in ["institut", "datum"] + PARTIER if k not in df.columns]
+    if saknas:
+        raise RuntimeError(
+            f"egna_matningar.csv saknar kolumnerna: {', '.join(saknas)}")
+
+    df["datum"] = pd.to_datetime(df["datum"], errors="coerce")
+    if df["datum"].isna().any():
+        trasiga = df.loc[df["datum"].isna(), "institut"].tolist()
+        raise RuntimeError(
+            f"egna_matningar.csv har ogiltigt datum för: {', '.join(map(str, trasiga))}. "
+            "Skriv datum som ÅÅÅÅ-MM-DD.")
+    df["datum"] = df["datum"].dt.date.astype(str)
+
+    for parti in PARTIER:
+        df[parti] = pd.to_numeric(df[parti], errors="coerce")
+    if df[PARTIER].isna().any().any():
+        raise RuntimeError("egna_matningar.csv har tomma eller ogiltiga partisiffror.")
+
+    summa = df[PARTIER].sum(axis=1)
+    orimliga = df.loc[(summa < 85) | (summa > 105)]
+    if not orimliga.empty:
+        rad = orimliga.iloc[0]
+        raise RuntimeError(
+            f"egna_matningar.csv: {rad['institut']} {rad['datum']} summerar till "
+            f"{summa.loc[orimliga.index[0]]:.1f} procent. Kontrollera siffrorna.")
+
+    if "urval" not in df.columns:
+        df["urval"] = None
+    df["urval_skattat"] = df["urval"].isna()
+    df["urval"] = [
+        u if pd.notna(u) else INSTITUT.get(i, {}).get("typiskt_urval", STANDARD_URVAL)
+        for u, i in zip(df["urval"], df["institut"])
+    ]
+    return df[["institut", "datum", "urval", "urval_skattat"] + PARTIER]
+
+
+def slask_ihop(skrapade: pd.DataFrame) -> pd.DataFrame:
+    """Lägger egna mätningar ovanpå de skrapade.
+
+    Egna rader vinner vid krock på institut och datum, så att en mätning man
+    lagt in för hand inte dubbleras när Wikipedia kommer ikapp.
+    """
+    egna = egna_matningar()
+    if egna.empty:
+        return skrapade
+    ihop = pd.concat([egna, skrapade], ignore_index=True)
+    ihop = ihop.drop_duplicates(subset=["institut", "datum"], keep="first")
+    return ihop.sort_values("datum", ascending=False).reset_index(drop=True)
 
 
 def spara(df: pd.DataFrame, valar: int = 2026) -> Path:

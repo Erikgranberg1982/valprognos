@@ -64,13 +64,19 @@ def main() -> None:
 
     # Senaste mätningen får inte vara för gammal, annars har hämtningen
     # tystnat utan att fela.
+    # I valrörelsen kommer mätningar varje vecka, så en tystnad på tre veckor
+    # betyder nästan säkert att skrapningen gått sönder snarare än att inget
+    # publicerats. Utanför slutspurten är takten lägre och gränsen generösare.
     alder = (pd.Timestamp.now() - df["datum"].max()).days
-    if alder > 120:
-        fel(f"Senaste mätningen är {alder} dagar gammal. Hämtningen kan ha slutat "
-            "fungera.")
+    sys.path.insert(0, str(ROT / "src"))
+    import config as _cfg_datum
+    dagar_till_val = (pd.Timestamp(_cfg_datum.VALDAG) - pd.Timestamp.now()).days
+    grans = 21 if dagar_till_val <= 90 else 120
+    if alder > grans:
+        fel(f"Senaste mätningen är {alder} dagar gammal, gränsen är {grans}. "
+            "Hämtningen kan ha slutat fungera.")
 
     # Prognosens nivåer ska vara rimliga.
-    sys.path.insert(0, str(ROT / "src"))
     import config as cfg
     import prognos as huvud
 
