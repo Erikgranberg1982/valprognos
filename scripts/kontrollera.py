@@ -104,8 +104,21 @@ def main() -> None:
 
     # Kandidatprognosen ligger i en egen fil som måste följa med vid publicering.
     kandidater = sida.parent / "kandidater.json"
-    if "kandblock" in html and not kandidater.exists():
-        fel("Sidan visar kandidatprognos men kandidater.json saknas i output.")
+    if "kandblock" in html:
+        if not kandidater.exists():
+            fel("Sidan visar kandidatprognos men kandidater.json saknas.")
+        # En tom fil är värre än ingen: sidan ser hel ut men listan är borta.
+        # Det hände när källdatan låg i output, som inte versionshanteras, så
+        # bygget i CI inte hittade den.
+        import json as _json
+        try:
+            kand = _json.loads(kandidater.read_text(encoding="utf-8"))
+        except Exception as e:
+            fel(f"kandidater.json går inte att läsa: {e}")
+        antal = sum(len(kand.get(n, {})) for n in ("kommun", "region"))
+        if antal < 100:
+            fel(f"kandidater.json innehåller bara {antal} områden. Kontrollera "
+                "att källfilerna finns i data/kandidater.")
 
     print(f"Kontroll godkänd: {len(df)} mätningar från {institut} institut, "
           f"senaste {df['datum'].max().date()}.")

@@ -39,25 +39,34 @@ METODNIVA = {
 }
 
 
+def _las_csv(namn: str) -> pd.DataFrame:
+    """Läser en kandidatfil från data/kandidater.
+
+    Filerna ligger gzip-komprimerade och versionshanterade, eftersom de behövs
+    när sidan byggs i CI. Tidigare låg de i output, som inte versionshanteras,
+    vilket gjorde att bygget skrev en tom kandidatfil.
+
+    Okomprimerad fil accepteras också, så att en nyare export kan läggas in
+    utan att först komprimeras.
+    """
+    katalog = ROT / "data" / "kandidater"
+    for fil in (katalog / f"{namn}.csv.gz", katalog / f"{namn}.csv",
+                ROT / "output" / f"{namn}.csv"):
+        if fil.exists():
+            try:
+                return pd.read_csv(fil, dtype=str)
+            except Exception:
+                continue
+    return pd.DataFrame()
+
+
 def _las(niva: str) -> pd.DataFrame:
-    fil = ROT / "output" / f"kandidatprognos_{niva}.csv"
-    if not fil.exists():
-        return pd.DataFrame()
-    try:
-        return pd.read_csv(fil, dtype=str)
-    except Exception:
-        return pd.DataFrame()
+    return _las_csv(f"kandidatprognos_{niva}")
 
 
 def las_utelamnade() -> pd.DataFrame:
     """Områden och partier där ingen kandidatprognos kunde göras."""
-    fil = ROT / "output" / "kandidatprognos_utelamnade.csv"
-    if not fil.exists():
-        return pd.DataFrame()
-    try:
-        return pd.read_csv(fil, dtype=str)
-    except Exception:
-        return pd.DataFrame()
+    return _las_csv("kandidatprognos_utelamnade")
 
 
 def _omradeskod(niva: str, kod: str) -> str:

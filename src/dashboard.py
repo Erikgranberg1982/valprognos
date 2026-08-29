@@ -384,6 +384,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     data["kommun_gz"] = base64.b64encode(
         gzip.compress(kommun_json.encode("utf-8"), 9)).decode("ascii")
 
+
     return (html, json.dumps(data, ensure_ascii=False), kommun_json)
 
 
@@ -2055,10 +2056,10 @@ const LOKAL = {lokal_json};
         return svar.json();
       }})
       .then(function(data) {{ KAND = data; return data; }})
-      .catch(function(e) {{
+      .catch(function() {{
         kandLaddning = null;
-        /* Webbläsaren blockerar filhämtning från file://, vilket är det
-           vanligaste skälet. Skilj det från att filen faktiskt saknas. */
+        /* Webbläsaren blockerar filhämtning från file://. Skilj det från
+           att filen faktiskt saknas på servern. */
         kandFel = (location.protocol === 'file:') ? 'lokal' : 'saknas';
         return null;
       }});
@@ -2156,7 +2157,8 @@ const LOKAL = {lokal_json};
         rader + saknasblock +
         '<p class="koalnot">Kandidaterna hämtas i listordning från ' +
         'Valmyndighetens registrerade listor. Personröster kan flytta namn ' +
-        'förbi varandra och ingår inte i prognosen.' + osakertext + '</p>';
+        'förbi varandra och ingår inte i prognosen.' + osakertext +
+        '</p>';
     }});
   }}
 
