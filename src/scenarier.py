@@ -10,11 +10,16 @@ och koalitioner med samma metod som huvudprognosen.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, timedelta
+
+from pathlib import Path
 
 import pandas as pd
 
 import config as cfg
 import modell
+
+ROT = Path(__file__).resolve().parent.parent
 
 
 # Riksdagens 349 mandat fördelas i 29 valkretsar. Örebro län har tolv, vilket
@@ -25,6 +30,23 @@ VALKRETSMANDAT = {"Örebro län": 12}
 # Institut med tät och jämn publicering, som gör en trendlinje meningsfull.
 TRENDINSTITUT = ["Demoskop", "Novus"]
 TRENDSTART = "2026-06-01"
+
+# Tidigare riksdagsval med mätningar under valrörelsen, för scenarierna om
+# att valspurten upprepar sig. Wikipedias sidor för 2010 och 2014 har en
+# annan tabellstruktur som skraparen inte tolkar, så underlaget är två val.
+TIDIGARE_VAL = {
+    2018: {
+        "valdag": date(2018, 9, 9),
+        "fil": "matningar_2018.csv",
+        "utfall": {"V": 8.00, "S": 28.26, "MP": 4.41, "C": 8.61,
+                   "L": 5.49, "M": 19.84, "KD": 6.32, "SD": 17.53},
+    },
+    2022: {
+        "valdag": date(2022, 9, 11),
+        "fil": "matningar_2022.csv",
+        "utfall": dict(cfg.VALRESULTAT_2022),
+    },
+}
 
 
 @dataclass
@@ -42,6 +64,73 @@ class Scenario:
     # Räknas ur mätdata i stället för att anges för hand.
     trend: bool = False
     trenddata: dict = field(default_factory=dict)
+    valspurt: list[int] | None = None
+    spurtdata: dict = field(default_factory=dict)
+
+
+def spurt_for_val(ar: int, dagar_kvar: int) -> dict:
+    """Hur mycket varje parti flyttade sig de sista dagarna i ett tidigare val.
+
+    Jämför sammanvägningen lika många dagar före valdagen med det faktiska
+    utfallet. Skillnaden är valspurten.
+    """
+    import prognos as _prognos
+
+    val = TIDIGARE_VAL[ar]
+    fil = ROT / "data" / val["fil"]
+    if not fil.exists():
+        raise FileNotFoundError(f"data/{val['fil']} saknas.")
+
+    df = _prognos.las_matningar(fil)
+    ref = val["valdag"] - timedelta(days=dagar_kvar)
+    hist = df[df["datum"] <= pd.Timestamp(ref)]
+    if len(hist) < 15:
+        raise ValueError(
+            f"För få mätningar från {ar} fram till {ref}: {len(hist)}.")
+
+    pop = _prognos.kor_prognos(hist, ref, val["valdag"])["snitt"]
+    return {
+        "ar": ar,
+        "referensdatum": ref.isoformat(),
+        "valdag": val["valdag"].isoformat(),
+        "antal_matningar": len(hist),
+        "pop": {p: float(pop[p]) for p in cfg.PARTIER},
+        "utfall": val["utfall"],
+        "spurt": {p: val["utfall"][p] - float(pop[p]) for p in cfg.PARTIER},
+    }
+
+
+def valspurt(baslinje, dagar_kvar: int, ar: list[int]) -> tuple[dict, dict]:
+    """Lägger tidigare valspurter ovanpå dagens läge.
+
+    Jämförelsedatumet flyttar sig av sig självt när valdagen närmar sig:
+    sexton dagar kvar jämförs med sexton dagar kvar i de tidigare valen. Ges
+    flera år används genomsnittet av deras spurter.
+    """
+    val = [spurt_for_val(a, dagar_kvar) for a in ar]
+    spurt = {p: sum(v["spurt"][p] for v in val) / len(val) for p in cfg.PARTIER}
+
+    nytt = {p: max(0.0, float(baslinje[p]) + spurt[p]) for p in cfg.PARTIER}
+    summa = sum(nytt.values())
+    normaliserad = {p: v * 100 / summa for p, v in nytt.items()}
+
+    # Pekar valen åt samma håll? Med bara ett val är frågan inte meningsfull.
+    if len(val) > 1:
+        ense = [p for p in cfg.PARTIER
+                if all(v["spurt"][p] > 0 for v in val)
+                or all(v["spurt"][p] < 0 for v in val)]
+    else:
+        ense = []
+
+    info = {
+        "dagar_kvar": dagar_kvar,
+        "ar": ar,
+        "val": val,
+        "spurt": spurt,
+        "eniga_partier": ense,
+        "obalanserad_summa": summa,
+    }
+    return normaliserad, info
 
 
 def trendforflyttning(matningar) -> tuple[dict, dict]:
@@ -164,6 +253,51 @@ SCENARIER = [
             "händer. Trenden svarar bara på vad riktningen pekar mot."
         ),
     ),
+    Scenario(
+        id="samma_valspurt",
+        namn="Samma valspurt som 2022",
+        fraga="Vad händer om upploppet upprepar sig precis som förra valet?",
+        beskrivning=(
+            "Opinionsmätningar och valresultat skiljer sig nästan alltid åt, "
+            "och skillnaden uppstår till stor del under de sista veckorna. "
+            "Scenariot mäter hur långt varje parti flyttade sig mellan "
+            "sammanvägningen och det faktiska utfallet 2022, räknat från "
+            "exakt lika många dagar före valdagen som i dag, och lägger den "
+            "rörelsen ovanpå dagens nivåer. Jämförelsedatumet flyttar sig "
+            "därför av sig självt allteftersom valdagen närmar sig."
+        ),
+        valspurt=[2022],
+        forbehall=(
+            "Vilar på ett enda val. Jämför med scenariot som väger in 2018: "
+            "de två valen pekar åt motsatt håll för sex av åtta partier, och "
+            "SD:s spurt var minus fyra procentenheter 2018 mot plus två 2022. "
+            "Läs siffran som en storleksordning på hur mycket ett upplopp kan "
+            "flytta, inte som en riktningsangivelse."
+        ),
+    ),
+    Scenario(
+        id="snitt_valspurt",
+        namn="Genomsnittlig valspurt",
+        fraga="Vad händer om upploppet liknar de två senaste valen i snitt?",
+        beskrivning=(
+            "Samma räkning som föregående scenario, men med genomsnittet av "
+            "valspurten 2018 och 2022 i stället för bara det senaste valet. "
+            "Att jämföra de två scenarierna säger mer än något av dem säger "
+            "ensamt: där de pekar åt olika håll finns inget mönster att luta "
+            "sig mot."
+        ),
+        valspurt=[2018, 2022],
+        forbehall=(
+            "Två val är fortfarande ett tunt underlag, och att ta "
+            "genomsnittet av två motsatta rörelser ger ett tal nära noll som "
+            "inte betyder att ingenting händer, bara att valen sa olika "
+            "saker. Bara Vänsterpartiet och Socialdemokraterna rörde sig åt "
+            "samma håll i båda valen. Wikipedias sidor för 2010 och 2014 har "
+            "en annan tabellstruktur som modellens skrapare inte tolkar, så "
+            "underlaget går inte att utöka utan handpåläggning."
+        ),
+    ),
+
 ]
 
 
@@ -241,7 +375,8 @@ def valkretsrakning(roster: dict[str, float], vp: dict) -> dict:
 
 
 def kor(scenario: Scenario, baslinje: pd.Series,
-        matningar: pd.DataFrame | None = None) -> dict:
+        matningar: pd.DataFrame | None = None,
+        dagar_kvar: int | None = None) -> dict:
     """Räknar ut ett scenarios utfall från prognosens viktade snitt."""
     bas = {p: float(baslinje[p]) for p in cfg.PARTIER}
 
@@ -250,6 +385,11 @@ def kor(scenario: Scenario, baslinje: pd.Series,
             raise ValueError("Trendscenariot behöver mätningarna.")
         nytt, info = trendforflyttning(matningar)
         scenario.trenddata = info
+    elif scenario.valspurt:
+        if dagar_kvar is None:
+            raise ValueError("Valspurtscenariot behöver antal dagar kvar.")
+        nytt, info = valspurt(baslinje, dagar_kvar, scenario.valspurt)
+        scenario.spurtdata = info
     else:
         nytt = dict(bas)
         for parti, delta in scenario.forflyttning.items():
@@ -301,10 +441,16 @@ def _koalitioner(mandat_bas: dict, mandat_nytt: dict,
 
 
 def kor_alla(baslinje: pd.Series,
-             matningar: pd.DataFrame | None = None) -> list[dict]:
+             matningar: pd.DataFrame | None = None,
+             dagar_kvar: int | None = None) -> list[dict]:
     ut = []
     for s in SCENARIER:
         if s.trend and matningar is None:
             continue
-        ut.append(kor(s, baslinje, matningar))
+        if s.valspurt and dagar_kvar is None:
+            continue
+        try:
+            ut.append(kor(s, baslinje, matningar, dagar_kvar))
+        except Exception as fel:
+            print(f"  Scenariot {s.id} kunde inte räknas: {fel}")
     return ut

@@ -26,7 +26,7 @@ def _mandatstapel(mandat: dict, farger: dict) -> str:
 
 
 def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
-    utfall = scenarier.kor_alla(baslinje, matningar)
+    utfall = scenarier.kor_alla(baslinje, matningar, meta.get("dagar_kvar"))
 
     farger = dict(cfg.PARTIFARG)
     for u in utfall:
@@ -54,6 +54,89 @@ def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
     ut = katalog / "scenarier_2026.html"
     ut.write_text(html, encoding="utf-8")
     return ut
+
+
+def _spurtunderlag(u: dict, farger: dict) -> str:
+    """Visar tidigare valspurter och hur de läggs på dagens läge."""
+    info = u["scenario"].spurtdata
+    if not info:
+        return ""
+
+    val = info["val"]
+    flera = len(val) > 1
+    dk = info["dagar_kvar"]
+
+    kolumner = "".join(
+        f'<th class="ta">{v["ar"]}</th>' for v in val)
+    snittkol = '<th class="ta">Snitt</th>' if flera else ""
+
+    rader = []
+    for p in cfg.PARTIER:
+        celler = []
+        for v in val:
+            x = v["spurt"][p]
+            kl = "upp" if x > 0.05 else ("ned" if x < -0.05 else "noll")
+            celler.append(f'<td class="ta {kl}">{x:+.2f}</td>')
+        if flera:
+            x = info["spurt"][p]
+            kl = "upp" if x > 0.05 else ("ned" if x < -0.05 else "noll")
+            celler.append(f'<td class="ta {kl}"><strong>{x:+.2f}</strong></td>')
+
+        # Markera partier där valen pekar åt olika håll.
+        oense = flera and p not in info["eniga_partier"]
+        markering = ' class="oense"' if oense else ""
+        rader.append(
+            f'<tr{markering}><td><span class="pp" '
+            f'style="background:{cfg.PARTIFARG[p]}"></span>{cfg.PARTINAMN[p]}'
+            + ('<span class="flagga" data-tip="Valen pekar åt olika håll">≠</span>'
+               if oense else "") + '</td>'
+            + "".join(celler)
+            + f'<td class="ta">{u["roster_bas"][p]:.1f}</td>'
+              f'<td class="ta"><strong>{u["roster_nytt"][p]:.1f}</strong></td></tr>')
+
+    datum = ", ".join(f'{v["referensdatum"]} ({v["ar"]})' for v in val)
+    matn = " och ".join(
+        f'{v["antal_matningar"]} mätningar från {v["ar"]}' for v in val)
+
+    if flera:
+        ense = info["eniga_partier"]
+        slutkommentar = (
+            f'Bara {len(ense)} av {len(cfg.PARTIER)} partier rörde sig åt '
+            f'samma håll i båda valen: '
+            f'{" och ".join(cfg.PARTINAMN[p] for p in ense)}. '
+            f'Övriga är markerade med <em>≠</em>. Det är i sig ett resultat: '
+            f'valspurten har inget stabilt mönster, och genomsnittet av två '
+            f'motsatta rörelser säger mindre än de två rörelserna var för sig.'
+            if ense else
+            'Inget parti rörde sig åt samma håll i båda valen.')
+    else:
+        slutkommentar = (
+            'Underlaget är ett enda val. Jämför med scenariot som väger in '
+            '2018 för att se hur olika två valrörelser kan se ut.')
+
+    return f'''
+  <h2>Underlaget</h2>
+  <div class="rub">Vad som hände på upploppet</div>
+  <div class="kort">
+    <p class="besk">I dag är det {dk} dagar kvar till valdagen. Lika många
+    dagar före tidigare val var det {datum}, och sammanvägningarna byggde på
+    {matn}. Kolumnerna visar skillnaden mellan sammanvägningen då
+    och det faktiska valresultatet, alltså den rörelse som skedde under de
+    sista {dk} dagarna.</p>
+    <div class="rulla">
+    <table class="tab">
+      <thead><tr><th>Parti</th>{kolumner}{snittkol}
+      <th class="ta">Prognos i dag</th>
+      <th class="ta">Med spurten</th></tr></thead>
+      <tbody>{"".join(rader)}</tbody>
+    </table>
+    </div>
+    <p class="fot">{slutkommentar} Jämförelsedatumet flyttar sig med
+    kalendern: när det är tio dagar kvar jämförs läget med tio dagar före
+    valdagen i de tidigare valen. Nivåerna skalas om till hundra procent
+    ({info["obalanserad_summa"]:.1f} procent före omskalning) innan mandaten
+    fördelas.</p>
+  </div>'''
 
 
 def _trendunderlag(u: dict, farger: dict) -> str:
@@ -220,6 +303,8 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
     vr_html = _valkretsrakning(u, farger) if s.valkretsparti else ""
     if s.trend:
         vr_html = _trendunderlag(u, farger)
+    elif s.valspurt:
+        vr_html = _spurtunderlag(u, farger)
 
     return f'''
 <section class="spanel" id="s-{s.id}"{' hidden' if dold else ''}>
@@ -351,6 +436,8 @@ border:1.5px solid transparent}}
 .mkv{{color:var(--svag);font-variant-numeric:tabular-nums;font-size:11px}}
 .rulla{{overflow-x:auto}}
 .lutrad td{{border-top:2px solid var(--linje);background:var(--panel)}}
+.flagga{{margin-left:7px;font-weight:800;color:var(--korall);cursor:help}}
+tr.oense td:first-child{{font-weight:600}}
 .varn{{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
 gap:13px;margin-top:22px}}
 .vk{{background:var(--panel);border-radius:12px;padding:16px 18px}}
