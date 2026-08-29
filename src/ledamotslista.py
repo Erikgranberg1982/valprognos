@@ -76,7 +76,8 @@ def skriv(katalog: Path) -> Path | None:
     ordning = df.groupby("parti").size().sort_values(ascending=False).index
     knappar = "".join(f'<button data-f="{p}">{p}</button>' for p in ordning)
 
-    html = _MALL.format(antal=len(df), valkretsar=df["valkretsnamn"].nunique(),
+    html = _MALL.format(antal=len(df),
+        ga=cfg.google_analytics(),valkretsar=df["valkretsnamn"].nunique(),
                         farg=farg, knappar=knappar, rader="".join(rader))
 
     katalog.mkdir(parents=True, exist_ok=True)
@@ -96,6 +97,7 @@ def skriv(katalog: Path) -> Path | None:
 _MALL = '''<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riksdagen 2026 – prognosticerade ledamöter</title>
+{ga}
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{{--bg:#fff;--text:#003D63;--svag:#69727D;--linje:#E3E8F0;--panel:#F1F3FA;

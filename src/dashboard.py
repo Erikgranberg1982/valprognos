@@ -815,22 +815,14 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
     partikolumner = "".join(f'<th class="tal">{p}</th>' for p in cfg.PARTIER)
     # Svenskt talformat använder mellanslag som tusentalsavgränsare.
     sim_text = f"{meta['antal_simuleringar']:,}".replace(",", "\u00a0")
+    ga = cfg.google_analytics()
 
     return f"""<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Valprognos 2026</title>
 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-8C4Y5LMHXS"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){{dataLayer.push(arguments);}}
-  gtag('js', new Date());
-
-  gtag('config', 'G-8C4Y5LMHXS');
-</script>
-
+{ga}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">

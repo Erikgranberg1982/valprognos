@@ -117,6 +117,7 @@ def skriv(katalog: Path, sammanfattning: pd.DataFrame,
     datum = [d.strftime("%Y-%m-%d") for d in trend["datum"]] if "datum" in trend else []
 
     html = _MALL.format(
+        ga=cfg.google_analytics(),
         flikar=flikar,
         data=json.dumps(data, ensure_ascii=False, separators=(",", ":")),
         datum=json.dumps(datum),
@@ -134,6 +135,7 @@ def skriv(katalog: Path, sammanfattning: pd.DataFrame,
 _MALL = """<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Partierna i riksdagsvalet 2026</title>
+{ga}
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{{--bg:#fff;--text:#003D63;--svag:#69727D;--linje:#E3E8F0;--panel:#F1F3FA;

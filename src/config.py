@@ -153,6 +153,30 @@ def _las_valdagskorrigering():
 
 VALDAGSKORRIGERING = _las_valdagskorrigering()
 
+# Google Analytics. Tom sträng stänger av mätningen på samtliga sidor.
+GA_MATNING_ID = "G-8C4Y5LMHXS"
+
+
+def google_analytics() -> str:
+    """Mätkoden, eller tom sträng om ingen mätning är konfigurerad.
+
+    Läggs på alla sidor så att statistiken täcker hela webbplatsen och inte
+    bara startsidan. Dubbla klamrar eftersom mallarna är f-strängar.
+    """
+    if not GA_MATNING_ID:
+        return ""
+    return f"""
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id={GA_MATNING_ID}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{{{dataLayer.push(arguments);}}}}
+  gtag('js', new Date());
+  gtag('config', '{GA_MATNING_ID}');
+</script>
+"""
+
+
 # Aggregat som inte är råmätningar och därför måste exkluderas.
 EXKLUDERA = ["Poll of polls", "Mätningarnas mätning", "Svensk väljaropinion",
              "Valprognos 2026", "Sammanvägningar", "Valet"]
