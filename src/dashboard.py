@@ -383,6 +383,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
     # direkt från filsystemet eftersom webbläsaren blockerar fetch mot file://.
     data["kommun_gz"] = base64.b64encode(
         gzip.compress(kommun_json.encode("utf-8"), 9)).decode("ascii")
+
     return (html, json.dumps(data, ensure_ascii=False), kommun_json)
 
 
@@ -1160,6 +1161,8 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .kandbricka:hover .kandnr {{ color:var(--korall); }}
 .kandladdar, .kandfel {{ font-size:13px; color:var(--svag); margin:6px 0 0; }}
 .kandfel {{ color:var(--korall-mork); max-width:620px; line-height:1.6; }}
+.kandfel code {{ background:var(--panel); padding:1px 6px; border-radius:4px;
+  font-size:12px; }}
 .kandsaknas {{ margin-top:14px; padding:12px 16px; background:var(--panel);
   border-radius:10px; font-size:12.5px; color:var(--svag); }}
 .kandsaknas ul {{ margin:6px 0 0; padding-left:18px; }}
@@ -2038,16 +2041,27 @@ const LOKAL = {lokal_json};
   let KAND = null;
   let kandLaddning = null;
 
+  /* Kandidatdatan ligger i en egen fil eftersom den är 434 kB och bara behövs
+     när ett område öppnas. Sidan väger därmed 266 kB i stället för 435. */
+  let kandFel = null;
+
   function hamtaKandidater() {{
     if (KAND) return Promise.resolve(KAND);
     if (kandLaddning) return kandLaddning;
+
     kandLaddning = fetch('{KANDIDATFIL}')
       .then(function(svar) {{
         if (!svar.ok) throw new Error('HTTP ' + svar.status);
         return svar.json();
       }})
       .then(function(data) {{ KAND = data; return data; }})
-      .catch(function() {{ kandLaddning = null; return null; }});
+      .catch(function(e) {{
+        kandLaddning = null;
+        /* Webbläsaren blockerar filhämtning från file://, vilket är det
+           vanligaste skälet. Skilj det från att filen faktiskt saknas. */
+        kandFel = (location.protocol === 'file:') ? 'lokal' : 'saknas';
+        return null;
+      }});
     return kandLaddning;
   }}
 
@@ -2069,10 +2083,23 @@ const LOKAL = {lokal_json};
       const omr = data && data[niva] && data[niva][post.kod];
 
       if (!omr) {{
+        let text;
+        if (kandFel === 'lokal') {{
+          text = 'Kandidatprognosen ligger i filen kandidater.json bredvid ' +
+                 'sidan. Webbläsaren blockerar den när sidan öppnas direkt ' +
+                 'från Finder. Kör <code>python3 -m http.server</code> i ' +
+                 'mappen och öppna <code>localhost:8000</code>, eller titta ' +
+                 'på den publicerade sidan.';
+        }} else if (kandFel === 'saknas') {{
+          text = 'Filen kandidater.json kunde inte läsas. Kontrollera att den ' +
+                 'ligger i samma mapp som sidan.';
+        }} else {{
+          text = 'Ingen kandidatprognos finns för det här området. Partiernas ' +
+                 'listor för 2026 gick inte att matcha mot området i ' +
+                 'Valmyndighetens underlag.';
+        }}
         block.innerHTML = '<div class="koalrubrik">Vilka som tar mandaten</div>' +
-          '<p class="kandfel">Kandidatprognosen kunde inte hämtas. Den ligger i ' +
-          'en egen fil bredvid sidan, och blockeras när sidan öppnas direkt från ' +
-          'filsystemet i stället för via en webbserver.</p>';
+          '<p class="kandfel">' + text + '</p>';
         return;
       }}
 
