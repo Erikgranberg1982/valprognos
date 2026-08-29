@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+import zipfile
 import numpy as np
 import pandas as pd
 import requests
@@ -21,6 +22,7 @@ OUTPUT = ROT / "output"
 
 KANDIDATURER_URL = "https://data.val.se/filer/val2026/parti/kandidaturer.csv"
 DELTAGANDE_PARTIER_URL = "https://data.val.se/filer/val2026/parti/deltagande-partier.csv"
+KANDIDATURER_2022_URL = "https://data.val.se/filer/val2022/parti/kandidaturer.zip"
 
 VALTYP_FOR_NIVA = {"riksdag": "RD", "region": "RF", "kommun": "KF"}
 NIVA_FOR_VALTYP = {"RD": "riksdag", "R": "region", "RF": "region", "KF": "kommun"}
@@ -96,9 +98,30 @@ KANDIDATKOLUMNER = [
     "niva", "valtyp", "omrade_kod", "omrade_namn", "valkretskod",
     "valkretsnamn", "prognos_parti", "parti", "partibeteckning", "partiforkortning",
     "prognosmandat_parti", "listnummer", "listnamn", "listbeteckning",
+    "listval_metod", "listval_varning", "valkretsmetod", "kandidatval_metod",
+    "historisk_valkrets_2022", "hemvalkrets_2026", "prioritetsskäl",
     "deltagandegrund", "listmandat", "mandat_i_lista", "ordning",
-    "kandidatnummer", "namn", "alder_pa_valdagen", "kon",
-    "folkbokforingskommun", "valsedelsuppgift", "kalla",
+    "kandidatnummer", "namn", "alder_pa_valdagen", "kon", "folkbokforingskommun",
+    "valsedelsuppgift", "kalla",
+]
+
+LAN_TILL_RD_VALKRETS = {
+    "03": "03", "04": "04", "05": "05", "06": "06", "07": "07", "08": "08",
+    "09": "09", "10": "10", "13": "15", "17": "21", "18": "22", "19": "23",
+    "20": "24", "21": "25", "22": "26", "23": "27", "24": "28", "25": "29",
+}
+
+SPECIALKOMMUN_TILL_RD_VALKRETS = {
+    "stockholm": "01",
+    "malmö": "11",
+    "gotland": "09",
+    "göteborg": "16",
+}
+
+UTELAMNADE_KOLUMNER = [
+    "niva", "valtyp", "omrade_kod", "omrade_namn", "valkretskod",
+    "valkretsnamn", "parti", "mandat", "antal_listor", "valkretsmetod", "skäl",
+    "listnummer", "listnamn",
 ]
 
 
@@ -127,6 +150,11 @@ def hamta_kandidaturfil(tvinga: bool = False) -> Path:
 def hamta_deltagande_partier_fil(tvinga: bool = False) -> Path:
     """Hämtar Valmyndighetens fil med alla deltagande partier i valet 2026."""
     return _hamta(DELTAGANDE_PARTIER_URL, "deltagande_partier_2026.csv", tvinga)
+
+
+def hamta_kandidaturfil_2022(tvinga: bool = False) -> Path:
+    """Hämtar Valmyndighetens kandidaturfil från valet 2022."""
+    return _hamta(KANDIDATURER_2022_URL, "kandidaturer_2022.zip", tvinga)
 
 
 def _norm(text: object) -> str:
@@ -250,6 +278,41 @@ def las_kandidaturer(tvinga: bool = False) -> pd.DataFrame:
     return df
 
 
+def las_kandidaturer_2022(tvinga: bool = False) -> pd.DataFrame:
+    """Läser och normaliserar Valmyndighetens kandidaturfil för valet 2022."""
+    fil = hamta_kandidaturfil_2022(tvinga)
+    with zipfile.ZipFile(fil) as zf:
+        with zf.open("kandidaturer.csv") as fh:
+            df = pd.read_csv(
+                fh,
+                sep=";",
+                dtype=str,
+                encoding="utf-8-sig",
+                keep_default_na=False,
+            ).rename(columns=KOLUMN_MAP)
+
+    for kolumn in KOLUMN_MAP.values():
+        if kolumn not in df.columns:
+            df[kolumn] = ""
+        df[kolumn] = df[kolumn].astype(str).str.strip()
+
+    df["partikod"] = df["partikod"].map(lambda x: _zfill_text(x, 4))
+    df["listnummer"] = df["listnummer"].map(lambda x: _zfill_text(x, 5))
+    df["valkretskod"] = df["valkretskod"].map(lambda x: _zfill_text(x, 2))
+    df["ordning"] = _talserie(df["ordning"])
+    df["giltig"] = df["giltig"].str.upper().eq("J")
+    df["niva"] = df["valtyp"].map(NIVA_FOR_VALTYP)
+    df["parti"] = df.apply(_partikod_till_parti, axis=1)
+    df["partinyckel"] = df["parti"].fillna("").astype(str)
+    utan_partikod = df["partinyckel"].eq("")
+    df.loc[utan_partikod, "partinyckel"] = df.loc[utan_partikod, "partibeteckning"].map(_norm)
+    df["listbeteckning"] = df.apply(_listbeteckning, axis=1)
+    df = _forbattra_listbeteckningar(df)
+    df["listnamn"] = df.apply(_listnamn, axis=1)
+    df["namn_norm"] = df["namn"].map(_norm)
+    return df
+
+
 def las_deltagande_partier(tvinga: bool = False) -> pd.DataFrame:
     """Läser deltagande partier och normaliserar partinycklar."""
     fil = hamta_deltagande_partier_fil(tvinga)
@@ -319,6 +382,78 @@ def _partinyckel(parti: str) -> str:
     return _norm(parti)
 
 
+def _riksdagsmandat_2022_per_valkrets() -> dict[tuple[str, str], int]:
+    """Härleder partimandat 2022 per valkrets från SCB:s rösttal."""
+    try:
+        import scb_data
+        roster = scb_data.hamta_riksdagsval_per_valkrets_roster(["2022"])
+    except Exception:
+        return {}
+
+    if roster.empty:
+        return {}
+
+    try:
+        roster_2022 = roster.xs("2022", level="ar")
+    except (KeyError, ValueError):
+        return {}
+
+    ut: dict[tuple[str, str], int] = {}
+    for parti, partimandat in cfg.MANDAT_2022.items():
+        if parti not in roster_2022.columns:
+            continue
+        fordelning = _fordela_mandat(roster_2022[parti], partimandat)
+        for valkretskod, mandat in fordelning.items():
+            if mandat > 0:
+                ut[(parti, str(valkretskod).zfill(2))] = int(mandat)
+    return ut
+
+
+def _invalda_riksdag_2022_proxy() -> dict[tuple[str, str], str]:
+    """Proxy för var toppnamn blev invalda 2022.
+
+    Valmyndighetens personröstfil saknar en enkel invald-flagga i rådatafilen.
+    Vi använder därför 2022 års kandidaturfil och SCB:s rösttal: partiets
+    faktiska 2022-mandat bryts ned på valkretsar och de översta giltiga namnen
+    på respektive valkretslista antas vara invalda där. Det räcker som
+    geografisk prioritering för återkommande nationella toppnamn 2026.
+    """
+    mandat = _riksdagsmandat_2022_per_valkrets()
+    if not mandat:
+        return {}
+
+    try:
+        kandidaturer = las_kandidaturer_2022()
+    except Exception:
+        return {}
+
+    rd = kandidaturer[
+        kandidaturer["valtyp"].eq("RD")
+        & kandidaturer["parti"].isin(cfg.PARTIER)
+        & kandidaturer["giltig"]
+        & kandidaturer["ordning"].notna()
+        & kandidaturer["namn_norm"].ne("")
+    ].copy()
+    if rd.empty:
+        return {}
+
+    ut: dict[tuple[str, str], str] = {}
+    for (parti, valkretskod), antal in mandat.items():
+        grupp = rd[(rd["parti"].eq(parti)) & (rd["valkretskod"].eq(valkretskod))]
+        if grupp.empty:
+            continue
+        listor, _metod, _varning, skäl = _valj_lista(vallistor(grupp))
+        if skäl is not None or listor.empty:
+            continue
+        listnummer = str(listor.iloc[0]["listnummer"])
+        kandidater = (grupp[grupp["listnummer"].eq(listnummer)]
+                      .sort_values(["ordning", "kandidatnummer"])
+                      .drop_duplicates("namn_norm"))
+        for _, kandidat in kandidater.head(int(antal)).iterrows():
+            ut[(parti, str(kandidat["namn_norm"]))] = valkretskod
+    return ut
+
+
 class VallisteIndex:
     """Snabba uppslag för listor och kandidater.
 
@@ -337,6 +472,7 @@ class VallisteIndex:
         self._lagg_till_deltagandegrund()
         self._listor_by_alias: dict[tuple[str, str, str], pd.DataFrame] = {}
         self._kandidater_by_lista: dict[tuple[str, str, str, str], pd.DataFrame] = {}
+        self.invalda_riksdag_2022 = _invalda_riksdag_2022_proxy()
         self._bygg_listindex()
         self._bygg_kandidatindex()
 
@@ -428,6 +564,9 @@ class VallisteIndex:
         nyckel = (valtyp, valomradeskod, str(partinyckel), listnummer)
         return self._kandidater_by_lista.get(nyckel, pd.DataFrame())
 
+    def historisk_riksdagsvalkrets(self, parti: str, namn: object) -> str:
+        return self.invalda_riksdag_2022.get((parti, _norm(namn)), "")
+
 
 def _listor_for(index: VallisteIndex, valtyp: str, parti: str,
                 valomradeskod: str | None = None) -> pd.DataFrame:
@@ -498,6 +637,93 @@ def _uteslut_parti(listor: pd.DataFrame, parti: str | None) -> pd.DataFrame:
     return listor[~mask]
 
 
+def _utelamna(utelamnade: list[dict] | None, valtyp: str, valomradeskod: str,
+              omradesnamn: str, parti: str, partimandat: int, skäl: str,
+              listor: pd.DataFrame | None = None,
+              valkretskod: str = "", valkretsnamn: str = "",
+              valkretsmetod: str = "") -> None:
+    if utelamnade is None:
+        return
+    listor = listor if listor is not None else pd.DataFrame()
+    utelamnade.append({
+        "niva": NIVA_FOR_VALTYP.get(valtyp, valtyp),
+        "valtyp": valtyp,
+        "omrade_kod": valomradeskod,
+        "omrade_namn": omradesnamn,
+        "valkretskod": valkretskod,
+        "valkretsnamn": valkretsnamn,
+        "parti": parti,
+        "mandat": int(partimandat),
+        "antal_listor": int(len(listor)),
+        "valkretsmetod": valkretsmetod,
+        "skäl": skäl,
+        "listnummer": ";".join(listor.get("listnummer", pd.Series(dtype=str)).astype(str).tolist()),
+        "listnamn": " | ".join(listor.get("listnamn", pd.Series(dtype=str)).astype(str).tolist()),
+    })
+
+
+def _valj_lista(listor: pd.DataFrame) -> tuple[pd.DataFrame, str, str, str | None]:
+    """Väljer lista enligt konservativ regel.
+
+    Returnerar vald lista, metod, varning och eventuellt utelämningsskäl.
+    """
+    listor = listor.drop_duplicates("listnummer").copy()
+    if listor.empty:
+        return listor, "", "", "saknar matchande lista"
+    if len(listor) == 1:
+        return listor, "exakt_en_lista", "", None
+
+    antal = pd.to_numeric(listor["antal_valsedlar"], errors="coerce").fillna(0.0)
+    max_antal = float(antal.max())
+    if max_antal <= 0:
+        return listor, "", "", "flera listor och saknar valsedelsantal"
+
+    topp = listor[antal.eq(max_antal)]
+    if len(topp) != 1:
+        return listor, "", "", "flera listor med samma högsta valsedelsantal"
+
+    vald = topp.copy()
+    total = float(antal.sum())
+    andel = max_antal / total * 100 if total > 0 else 0.0
+    varning = (
+        "Vald som proxy eftersom listan har flest tryckta valsedlar; "
+        "faktisk röstfördelning mellan listor är okänd."
+    )
+    if andel < 50:
+        varning += f" Listan står bara för {andel:.1f} procent av listupplagan."
+    return vald, "proxy_flest_valsedlar", varning, None
+
+
+def _valj_identisk_topplista(index: VallisteIndex, valtyp: str, valomradeskod: str,
+                            parti: str, listor: pd.DataFrame,
+                            partimandat: int) -> tuple[pd.DataFrame, str, str, str | None]:
+    """Löser listnummerdubletter när toppnamnen är identiska."""
+    antal = pd.to_numeric(listor["antal_valsedlar"], errors="coerce").fillna(0.0)
+    max_antal = float(antal.max()) if not antal.empty else 0.0
+    topp = listor[antal.eq(max_antal)].drop_duplicates("listnummer").copy()
+    if max_antal <= 0 or len(topp) <= 1:
+        return listor, "", "", "flera listor med samma högsta valsedelsantal"
+
+    jamfor_antal = max(int(partimandat), 1)
+    sekvenser = []
+    for _, lista in topp.iterrows():
+        kandidater = index.kandidater_for_lista(
+            valtyp, valomradeskod, lista["partinyckel"], str(lista["listnummer"]))
+        sekvens = tuple(kandidater.sort_values(["ordning", "kandidatnummer"])
+                        .head(jamfor_antal)["namn"].map(_norm).tolist())
+        sekvenser.append(sekvens)
+
+    if not sekvenser or not sekvenser[0] or any(s != sekvenser[0] for s in sekvenser[1:]):
+        return listor, "", "", "flera listor med samma högsta valsedelsantal"
+
+    vald = topp.sort_values("listnummer").head(1).copy()
+    varning = (
+        "Flera listnummer har samma valsedelsantal, men toppnamnen som behövs "
+        "för mandatprognosen är identiska; lägsta listnummer används som proxy."
+    )
+    return vald, "proxy_identisk_topplista", varning, None
+
+
 def _rd_valkretsar(index: VallisteIndex, omrade: str | None = None) -> pd.DataFrame:
     vk = (index.kandidaturer[index.kandidaturer["valtyp"].eq("RD")]
           [["valkretskod", "valkretsnamn"]]
@@ -534,9 +760,9 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
                                  omrade: str | None = None) -> pd.DataFrame:
     """Bryter ned nationella partimandat till riksdagsvalkretsar.
 
-    Valmyndighetens antal valsedlar används som fördelningsnyckel. Det är ett
-    praktiskt proxy-mått för valkretsstorlek när modellen bara har nationellt
-    partistöd.
+    SCB:s rösttal 2022 per valkrets används som geografisk bas och skalas med
+    den nationella prognosförändringen för partiet. Om SCB-underlaget saknas
+    används Valmyndighetens listupplaga som nödfallback.
     """
     sm = sammanfattning.set_index("parti")
     partimandat = {
@@ -551,6 +777,13 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
 
     valkretsar = _rd_valkretsar(index, omrade)
     rader = []
+    rostbas = pd.DataFrame()
+    try:
+        import scb_data
+        roster = scb_data.hamta_riksdagsval_per_valkrets_roster(["2022"])
+        rostbas = roster.xs("2022", level="ar") if not roster.empty else pd.DataFrame()
+    except Exception:
+        rostbas = pd.DataFrame()
 
     for parti, antal_partimandat in partimandat.items():
         if antal_partimandat <= 0:
@@ -561,8 +794,20 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
         for _, vk in valkretsar.iterrows():
             listor = _rd_listor_i_valkrets(alla_listor, vk["valkretsnamn"])
             listor_per_vk[vk["valkretskod"]] = listor
-            vikt = float(listor["antal_valsedlar"].sum()) if not listor.empty else 0.0
-            vikter[vk["valkretskod"]] = vikt
+
+        if not rostbas.empty and parti in rostbas.columns:
+            prognoskolumn = "stod_medel" if "stod_medel" in sm.columns else "prognos"
+            trend = float(sm.at[parti, prognoskolumn]) / cfg.VALRESULTAT_2022.get(parti, 1.0)
+            for _, vk in valkretsar.iterrows():
+                kod = str(vk["valkretskod"]).zfill(2)
+                vikter[kod] = float(rostbas[parti].get(kod, 0.0)) * trend
+            valkretsmetod = "scb_roster_2022_trend"
+        else:
+            for _, vk in valkretsar.iterrows():
+                kod = str(vk["valkretskod"]).zfill(2)
+                listor = listor_per_vk.get(kod, pd.DataFrame())
+                vikter[kod] = float(listor["antal_valsedlar"].sum()) if not listor.empty else 0.0
+            valkretsmetod = "valsedelsupplaga_proxy"
 
         vk_mandat = _fordela_mandat(pd.Series(vikter), antal_partimandat)
         for _, vk in valkretsar.iterrows():
@@ -576,6 +821,7 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
                 "parti": parti,
                 "mandat": antal,
                 "listor": listor_per_vk.get(kod, pd.DataFrame()),
+                "valkretsmetod": valkretsmetod,
             })
     return pd.DataFrame(rader)
 
@@ -583,15 +829,33 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
 def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
                      omradesnamn: str, parti: str, partimandat: int,
                      listor: pd.DataFrame, valda: set[str],
-                     valkretskod: str = "", valkretsnamn: str = "") -> list[dict]:
+                     valkretskod: str = "", valkretsnamn: str = "",
+                     valkretsmetod: str = "",
+                     reserverade_valkretsar: set[str] | None = None,
+                     utelamnade: list[dict] | None = None) -> list[dict]:
     if partimandat <= 0 or listor.empty:
+        if partimandat > 0:
+            _utelamna(utelamnade, valtyp, valomradeskod, omradesnamn, parti,
+                      partimandat, "saknar matchande lista",
+                      valkretskod=valkretskod, valkretsnamn=valkretsnamn,
+                      valkretsmetod=valkretsmetod)
         return []
 
-    listor = listor.drop_duplicates("listnummer")
-    listmandat = _fordela_mandat(listor.set_index("listnummer")["antal_valsedlar"],
-                                 partimandat)
+    listor, listval_metod, listval_varning, skäl = _valj_lista(listor)
+    if skäl == "flera listor med samma högsta valsedelsantal":
+        listor, listval_metod, listval_varning, skäl = _valj_identisk_topplista(
+            index, valtyp, valomradeskod, parti, listor, partimandat)
+    if skäl is not None:
+        _utelamna(utelamnade, valtyp, valomradeskod, omradesnamn, parti,
+                  partimandat, skäl, listor,
+                  valkretskod=valkretskod, valkretsnamn=valkretsnamn,
+                  valkretsmetod=valkretsmetod)
+        return []
+
+    listmandat = {str(listor.iloc[0]["listnummer"]): int(partimandat)}
     rader = []
     listor = listor.set_index("listnummer", drop=False)
+    reserverade_valkretsar = reserverade_valkretsar or set()
 
     for listnummer, mandat in sorted(listmandat.items(), key=lambda x: (-x[1], x[0])):
         if mandat <= 0 or listnummer not in listor.index:
@@ -600,10 +864,29 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
         parti_label = str(lista["partiforkortning"] or lista["partibeteckning"])
         kandidater = index.kandidater_for_lista(
             valtyp, valomradeskod, lista["partinyckel"], listnummer)
+        if valtyp == "RD" and not kandidater.empty and valkretskod:
+            kandidater = kandidater.copy()
+            kandidater["historisk_valkrets_2022"] = kandidater["namn"].map(
+                lambda namn: index.historisk_riksdagsvalkrets(parti, namn)
+            )
+            kandidater["historisk_prio"] = kandidater["historisk_valkrets_2022"].eq(
+                str(valkretskod).zfill(2)
+            ).map({True: 0, False: 1})
+            kandidater = kandidater.sort_values(
+                ["historisk_prio", "ordning", "kandidatnummer"])
         lista_valkretskod = str(lista.get("valkretskod") or "")
         lista_valkretsnamn = str(lista.get("valkretsnamn") or lista["listbeteckning"] or "")
         plats = 0
         for _, kandidat in kandidater.iterrows():
+            historisk_vk = index.historisk_riksdagsvalkrets(parti, kandidat.get("namn"))
+            if (
+                valtyp == "RD"
+                and historisk_vk
+                and valkretskod
+                and historisk_vk != str(valkretskod).zfill(2)
+                and historisk_vk in reserverade_valkretsar
+            ):
+                continue
             kandidatnyckel = str(kandidat.get("kandidatnummer") or "").strip()
             if not kandidatnyckel:
                 kandidatnyckel = f"{parti}:{_norm(kandidat.get('namn'))}"
@@ -611,6 +894,11 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
                 continue
             valda.add(kandidatnyckel)
             plats += 1
+            kandidatval_metod = (
+                "historisk_valkrets_2022"
+                if valtyp == "RD" and historisk_vk and historisk_vk == str(valkretskod).zfill(2)
+                else "listordning"
+            )
             rader.append({
                 "niva": NIVA_FOR_VALTYP.get(valtyp, valtyp),
                 "valtyp": valtyp,
@@ -626,6 +914,11 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
                 "listnummer": listnummer,
                 "listnamn": lista["listnamn"],
                 "listbeteckning": lista["listbeteckning"],
+                "listval_metod": listval_metod,
+                "listval_varning": listval_varning,
+                "valkretsmetod": valkretsmetod,
+                "kandidatval_metod": kandidatval_metod,
+                "historisk_valkrets_2022": historisk_vk,
                 "deltagandegrund": str(lista.get("deltagandegrund") or ""),
                 "listmandat": int(mandat),
                 "mandat_i_lista": plats,
@@ -645,13 +938,21 @@ def _valj_kandidater(index: VallisteIndex, valtyp: str, valomradeskod: str,
 
 def kandidatprognos_riksdag(sammanfattning: pd.DataFrame,
                             index: VallisteIndex | None = None,
-                            omrade: str | None = None) -> pd.DataFrame:
+                            omrade: str | None = None,
+                            utelamnade: list[dict] | None = None) -> pd.DataFrame:
     """Predikterar riksdagsledamöter via prognosmandat per parti och valkrets."""
     index = index if index is not None else VallisteIndex(
         las_kandidaturer(), las_deltagande_partier())
     nedbrutet = _riksdagsmandat_per_valkrets(sammanfattning, index, omrade)
     rader = []
     valda_per_parti = {p: set() for p in cfg.PARTIER}
+    mandatvalkretsar_per_parti = {
+        parti: {
+            str(vk).zfill(2)
+            for vk in grupp["valkretskod"].astype(str)
+        }
+        for parti, grupp in nedbrutet.groupby("parti")
+    } if not nedbrutet.empty else {}
 
     for _, rad in nedbrutet.iterrows():
         parti = rad["parti"]
@@ -666,13 +967,17 @@ def kandidatprognos_riksdag(sammanfattning: pd.DataFrame,
             valda=valda_per_parti.setdefault(parti, set()),
             valkretskod=rad["valkretskod"],
             valkretsnamn=rad["valkretsnamn"],
+            valkretsmetod=rad.get("valkretsmetod", ""),
+            reserverade_valkretsar=mandatvalkretsar_per_parti.get(parti, set()),
+            utelamnade=utelamnade,
         ))
     return pd.DataFrame(rader, columns=KANDIDATKOLUMNER)
 
 
 def kandidatprognos_lokal(niva: str, sammanfattning: pd.DataFrame,
                           index: VallisteIndex | None = None,
-                          omrade: str | None = None) -> pd.DataFrame:
+                          omrade: str | None = None,
+                          utelamnade: list[dict] | None = None) -> pd.DataFrame:
     """Predikterar kandidater i region- eller kommunfullmäktige."""
     if niva not in ("region", "kommun"):
         raise ValueError("niva måste vara 'region' eller 'kommun'")
@@ -704,6 +1009,7 @@ def kandidatprognos_lokal(niva: str, sammanfattning: pd.DataFrame,
                 partimandat=mandat,
                 listor=listor,
                 valda=valda_i_omrade.setdefault(parti, set()),
+                utelamnade=utelamnade,
             ))
     return pd.DataFrame(rader, columns=KANDIDATKOLUMNER)
 
@@ -719,21 +1025,23 @@ def kandidatprognoser(res: dict, niva: str | None = None,
     )
     valda_nivaer = ["riksdag", "region", "kommun"] if niva is None else [niva]
     ut = {}
+    utelamnade: list[dict] = []
 
     if "riksdag" in valda_nivaer:
         ut["riksdag"] = kandidatprognos_riksdag(
-            res["sammanfattning"], index, omrade)
+            res["sammanfattning"], index, omrade, utelamnade)
 
     if "region" in valda_nivaer:
         import regionmodell
         regioner = regionmodell.sammanfatta(regionmodell.prognos_per_region(res["snitt"]))
-        ut["region"] = kandidatprognos_lokal("region", regioner, index, omrade)
+        ut["region"] = kandidatprognos_lokal("region", regioner, index, omrade, utelamnade)
 
     if "kommun" in valda_nivaer:
         import kommunmodell
         kommuner = kommunmodell.sammanfatta(kommunmodell.prognos_per_kommun(res["snitt"]))
-        ut["kommun"] = kandidatprognos_lokal("kommun", kommuner, index, omrade)
+        ut["kommun"] = kandidatprognos_lokal("kommun", kommuner, index, omrade, utelamnade)
 
+    ut["utelamnade"] = pd.DataFrame(utelamnade, columns=UTELAMNADE_KOLUMNER)
     return ut
 
 
@@ -773,7 +1081,8 @@ def skriv_terminal(utfiler: dict[str, dict]) -> None:
     print("-" * 66)
     for niva, info in utfiler.items():
         print(f"  {niva:<10}{info['antal']:>6} rader  {info['fil']}")
-    print("  Kandidaterna tas i listordning; personröster ingår inte.\n")
+    print("  Listval: exakt en lista används direkt; unik störst upplaga används med varning.")
+    print("  Oklara flerlistelägen sparas som utelämnade med skäl; personröster ingår inte.\n")
 
 
 if __name__ == "__main__":

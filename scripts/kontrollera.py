@@ -102,6 +102,11 @@ def main() -> None:
     if "Så beräknas region och kommun" not in html:
         fel("Metodavsnittet för region och kommun saknas i sidan.")
 
+    # Kandidatprognosen ligger i en egen fil som måste följa med vid publicering.
+    kandidater = sida.parent / "kandidater.json"
+    if "kandblock" in html and not kandidater.exists():
+        fel("Sidan visar kandidatprognos men kandidater.json saknas i output.")
+
     print(f"Kontroll godkänd: {len(df)} mätningar från {institut} institut, "
           f"senaste {df['datum'].max().date()}.")
     print(f"  Prognos: " + ", ".join(f"{p} {snitt[p]:.1f}" for p in PARTIER))

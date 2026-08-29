@@ -21,6 +21,11 @@ ROT = Path(__file__).resolve().parent.parent
 # Kommundata läggs i en egen fil intill sidan, så att den kan hämtas separat.
 KOMMUNFIL = "kommuner.json"
 
+# Kandidatprognosen är omkring 440 kB rå och behövs bara för den som öppnar ett
+# område. Den läggs därför i en egen fil som hämtas vid klick, till skillnad
+# från kommundatan som bäddas in eftersom den behövs direkt.
+KANDIDATFIL = "kandidater.json"
+
 # --- Lysio Research grafiska profil ------------------------------------------
 KORALL = "#EF7466"
 KORALL_MORK = "#D95B4C"
@@ -1133,6 +1138,36 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .kallcell {{ font-size:12.5px; color:var(--svag); max-width:340px; }}
 .matningsmeta {{ font-size:11.5px; color:var(--svag); font-weight:400;
   margin-top:2px; }}
+/* Kandidatprognosen. Namnen ligger som brickor som radbryter i stället för
+   som en lista, så att ett parti med trettio mandat tar tre rader och inte
+   trettio. */
+.kandblock {{ margin-top:22px; padding-top:20px;
+  border-top:1px solid var(--linje); }}
+.kandparti {{ margin-bottom:14px; }}
+.kandhuvud {{ display:flex; align-items:center; gap:8px; margin-bottom:7px;
+  font-size:13.5px; }}
+.kandmandat {{ color:var(--svag); font-size:12.5px; }}
+.kandvarn {{ font-size:10.5px; font-weight:700; padding:1px 8px;
+  border-radius:28px; background:var(--korall-ljus); color:var(--korall-mork);
+  cursor:help; }}
+.kandnamn {{ display:flex; flex-wrap:wrap; gap:5px; }}
+.kandbricka {{ display:inline-flex; align-items:baseline; gap:5px;
+  background:var(--panel); border-radius:6px; padding:3px 9px 3px 6px;
+  font-size:12.5px; cursor:help; white-space:nowrap; }}
+.kandbricka:hover {{ background:var(--korall-ljus); color:var(--korall-mork); }}
+.kandnr {{ font-size:10px; font-weight:700; color:var(--svag);
+  font-variant-numeric:tabular-nums; min-width:12px; text-align:right; }}
+.kandbricka:hover .kandnr {{ color:var(--korall); }}
+.kandladdar, .kandfel {{ font-size:13px; color:var(--svag); margin:6px 0 0; }}
+.kandfel {{ color:var(--korall-mork); max-width:620px; line-height:1.6; }}
+.kandsaknas {{ margin-top:14px; padding:12px 16px; background:var(--panel);
+  border-radius:10px; font-size:12.5px; color:var(--svag); }}
+.kandsaknas ul {{ margin:6px 0 0; padding-left:18px; }}
+.kandsaknas li {{ margin-bottom:3px; }}
+@media (max-width:640px) {{
+  .kandbricka {{ font-size:11.5px; padding:3px 7px 3px 5px; }}
+}}
+
 .vkblock {{ margin-top:22px; padding-top:20px;
   border-top:1px solid var(--linje); }}
 .vkblock .tabellwrap {{ border:none; }}
@@ -1906,6 +1941,10 @@ const LOKAL = {lokal_json};
         '</div>';
     }}
 
+    /* Kandidatprognosen ligger i en egen fil och hämtas vid första klicket.
+       Blocket ritas tomt först och fylls i när datan kommit. */
+    const kandhtml = '<div class="kandblock" id="kandblock"></div>';
+
     detalj.innerHTML =
       '<div class="detaljkort">' +
         '<div class="detaljhuvud">' +
@@ -1943,11 +1982,14 @@ const LOKAL = {lokal_json};
         '</div>' +
         koalhtml +
         vkhtml +
+        kandhtml +
         lokalnotis +
       '</div>';
     detalj.hidden = false;
     oversikt.hidden = true;
     rensa.hidden = false;
+
+    ritaKandidater(post);
   }}
 
   /* Plockar ut värdet som ska sorteras på. Nyckeln "stod:KD" betyder partiets
@@ -1986,6 +2028,108 @@ const LOKAL = {lokal_json};
       k.classList.toggle('fallande', aktiv && sortFallande);
       k.setAttribute('aria-sort', aktiv
         ? (sortFallande ? 'descending' : 'ascending') : 'none');
+    }});
+  }}
+
+
+  /* --- Kandidatprognos ------------------------------------------------
+     Vilka personer som väntas ta mandaten. Datan ligger i en egen fil
+     eftersom den är stor och bara behövs när ett område öppnats. */
+  let KAND = null;
+  let kandLaddning = null;
+
+  function hamtaKandidater() {{
+    if (KAND) return Promise.resolve(KAND);
+    if (kandLaddning) return kandLaddning;
+    kandLaddning = fetch('{KANDIDATFIL}')
+      .then(function(svar) {{
+        if (!svar.ok) throw new Error('HTTP ' + svar.status);
+        return svar.json();
+      }})
+      .then(function(data) {{ KAND = data; return data; }})
+      .catch(function() {{ kandLaddning = null; return null; }});
+    return kandLaddning;
+  }}
+
+  function kandidatnamn(text) {{
+    /* Lagrade som "Namn|ålder|ort", där ålder och ort kan saknas. */
+    const delar = String(text).split('|');
+    return {{ namn: delar[0], alder: delar[1] || '', ort: delar[2] || '' }};
+  }}
+
+  function ritaKandidater(post) {{
+    const block = document.getElementById('kandblock');
+    if (!block) return;
+
+    block.innerHTML = '<div class="koalrubrik">Vilka som tar mandaten</div>' +
+      '<p class="kandladdar">Hämtar kandidater ...</p>';
+
+    hamtaKandidater().then(function(data) {{
+      if (!block.isConnected) return;
+      const omr = data && data[niva] && data[niva][post.kod];
+
+      if (!omr) {{
+        block.innerHTML = '<div class="koalrubrik">Vilka som tar mandaten</div>' +
+          '<p class="kandfel">Kandidatprognosen kunde inte hämtas. Den ligger i ' +
+          'en egen fil bredvid sidan, och blockeras när sidan öppnas direkt från ' +
+          'filsystemet i stället för via en webbserver.</p>';
+        return;
+      }}
+
+      const partier = (omr.partier || []).filter(function(p) {{ return p.m > 0; }});
+      const rader = partier.map(function(p) {{
+        const farg = FARGER[p.p] || 'var(--svag)';
+        /* Namnen läggs som brickor som radbryter, så att ett parti med
+           trettio mandat inte blir en trettio rader lång lista. */
+        const brickor = p.k.slice(0, p.m).map(function(text, i) {{
+          const k = kandidatnamn(text);
+          const titel = k.namn + (k.alder ? ', ' + k.alder + ' år' : '') +
+                        (k.ort ? ', ' + k.ort : '') +
+                        ' — plats ' + (i + 1) + ' för ' + p.p;
+          return '<span class="kandbricka" title="' +
+                 titel.replace(/"/g, '&quot;') + '">' +
+                 '<span class="kandnr">' + (i + 1) + '</span>' + k.namn +
+                 '</span>';
+        }}).join('');
+
+        const flagga = p.niva === 'osakert'
+          ? '<span class="kandvarn" title="' +
+            (p.v || '').replace(/"/g, '&quot;') + '">osäker lista</span>'
+          : '';
+
+        return '<div class="kandparti">' +
+          '<div class="kandhuvud">' +
+            '<span class="prick" style="background:' + farg + '"></span>' +
+            '<strong>' + p.p + '</strong>' +
+            '<span class="kandmandat">' + p.m +
+            (p.m === 1 ? ' mandat' : ' mandat') + '</span>' + flagga +
+          '</div>' +
+          '<div class="kandnamn">' + brickor + '</div>' +
+        '</div>';
+      }}).join('');
+
+      const saknas = (omr.saknas || []).map(function(x) {{
+        return '<li><strong>' + x.p + '</strong> (' + x.m + ' mandat): ' +
+               x.skal + '</li>';
+      }}).join('');
+      const saknasblock = saknas
+        ? '<div class="kandsaknas"><strong>Utan kandidatprognos</strong>' +
+          '<ul>' + saknas + '</ul></div>'
+        : '';
+
+      const osakra = partier.filter(function(p) {{ return p.niva === 'osakert'; }}).length;
+      const osakertext = osakra
+        ? ' För ' + osakra + (osakra === 1 ? ' parti' : ' partier') +
+          ' finns flera listor i området, och den med flest tryckta valsedlar ' +
+          'används. Håll muspekaren över märkningen för detaljer.'
+        : '';
+
+      block.innerHTML =
+        '<div class="koalrubrik">Vilka som tar mandaten</div>' +
+        rader + saknasblock +
+        '<p class="koalnot">Kandidaterna hämtas i listordning från ' +
+        'Valmyndighetens registrerade listor. Personröster kan flytta namn ' +
+        'förbi varandra och ingår inte i prognosen.' + osakertext + '</p>';
     }});
   }}
 
@@ -2291,7 +2435,8 @@ window.addEventListener('resize', () => {{
 </body></html>""", kommun_json
 
 
-def spara(html: str, kommun_json: str | None = None) -> Path:
+def spara(html: str, kommun_json: str | None = None,
+          kandidat_json: str | None = None) -> Path:
     """Skriver sidan till output/.
 
     Filen heter index.html eftersom statisk hosting som GitHub Pages hämtar den
@@ -2307,4 +2452,6 @@ def spara(html: str, kommun_json: str | None = None) -> Path:
     # inte. Den skrivs ändå ut för den som vill använda datan för egen analys.
     if kommun_json and kommun_json != "[]":
         (katalog / KOMMUNFIL).write_text(kommun_json, encoding="utf-8")
+    if kandidat_json:
+        (katalog / KANDIDATFIL).write_text(kandidat_json, encoding="utf-8")
     return ut

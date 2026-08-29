@@ -390,7 +390,17 @@ def main() -> None:
             res["sammanfattning"], res["block"], res["regeringar"],
             trend, res["husfaktorer"], matningar, meta,
             regioner=regioner, kommuner=kommuner, valkretsar=valkretsar)
-        ut = dashboard.spara(html, kommun_json)
+        kandidat_json = None
+        try:
+            import json as _json
+            import kandidater as _kand
+            kandidat_json = _json.dumps(
+                {"kommun": _kand.per_omrade("kommun"),
+                 "region": _kand.per_omrade("region")},
+                ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            pass
+        ut = dashboard.spara(html, kommun_json, kandidat_json)
         print(f"Dashboard sparad: {ut}\n")
 
 

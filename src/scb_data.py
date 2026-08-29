@@ -135,6 +135,33 @@ def hamta_riksdagsval_per_region(ar: list[str] | None = None,
     return _andelar(df)
 
 
+def hamta_riksdagsval_per_valkrets_roster(ar: list[str] | None = None,
+                                          tvinga: bool = False) -> pd.DataFrame:
+    """Riksdagsvalets rösttal per riksdagsvalkrets.
+
+    Returnerar råa rösttal, inte andelar. Används när nationella mandat behöver
+    brytas ned till de 29 riksdagsvalkretsarna.
+    """
+    ar = ar or ["2022"]
+    valkretsar = [f"VR{i}" for i in range(1, 30)]
+    q = [
+        {"code": "Region", "selection": {"filter": "item", "values": valkretsar}},
+        {"code": "Partimm", "selection": {"filter": "item", "values": SCB_PARTIKODER}},
+        {"code": "ContentsCode", "selection": {"filter": "item", "values": ["ME0104B6"]}},
+        {"code": "Tid", "selection": {"filter": "item", "values": ar}},
+    ]
+    data = _post("ME0104/ME0104C/ME0104T3", q,
+                 f"riksdagsval_valkrets_roster_{'_'.join(ar)}", tvinga)
+    df = _till_dataframe(data, ["omrade", "parti", "ar"])
+    if df.empty:
+        return pd.DataFrame()
+    df["parti"] = df["parti"].map(SCB_PARTI)
+    df = df.dropna(subset=["parti"])
+    df["omrade"] = df["omrade"].astype(str).str.extract(r"VR(\d+)", expand=False).str.zfill(2)
+    df = df.dropna(subset=["omrade"])
+    return df.pivot_table(index=["omrade", "ar"], columns="parti", values="varde", aggfunc="sum")
+
+
 def hamta_psu_landsdel(matmanader: list[str] | None = None,
                        tvinga: bool = False) -> pd.DataFrame:
     """Partisympati per landsdel från partisympatiundersökningen.

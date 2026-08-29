@@ -27,18 +27,30 @@ Beroenden: `pandas`, `numpy`, `requests`, `beautifulsoup4`, `lxml`.
 ## Kandidat- och vallisteprognos
 
 `--kandidater` hämtar Valmyndighetens rådatafil med kandidaturer inför valet
-2026, cachelagrar den i `data/valmyndigheten/` och skriver fyra CSV-filer:
+2026, cachelagrar den i `data/valmyndigheten/` och skriver CSV-filer:
 
 - `output/vallistor_2026.csv` – alla namnvalsedlar med normaliserade listnamn.
-- `output/kandidatprognos_riksdag.csv` – 349 prognosticerade riksdagsledamöter.
+- `output/kandidatprognos_riksdag.csv` – prognosticerade riksdagsledamöter.
 - `output/kandidatprognos_region.csv` – prognosticerade regionledamöter.
 - `output/kandidatprognos_kommun.csv` – prognosticerade kommunledamöter.
+- `output/kandidatprognos_utelamnade.csv` – mandat där listkopplingen ännu
+  inte görs, med skäl per område och parti.
 
-Kandidaterna tas i listordning från giltiga kandidaturer. Om ett parti har
-flera namnvalsedlar i samma valområde fördelas partiets prognosmandat mellan
-listorna med samma jämkade uddatalsmetod som övriga modellen, viktat efter
-antalet tryckta valsedlar i Valmyndighetens fil. Personröster och faktisk
-röstfördelning mellan flera listor ingår inte.
+Kandidaterna tas i listordning från giltiga kandidaturer. Listvalet är
+avsiktligt konservativt: exakt en matchande namnlista används direkt. Om flera
+listor finns används bara en unik största lista efter antal tryckta valsedlar,
+och raderna märks med `listval_metod=proxy_flest_valsedlar` och en varning. Om
+flera listnummer har samma upplaga men identiska toppnamn för de mandat som ska
+tas ut används lägsta listnummer som proxy och märks med
+`listval_metod=proxy_identisk_topplista`. Om listläget fortfarande är oklart,
+eller om matchande lista saknas, sparas mandatet i
+`kandidatprognos_utelamnade.csv`.
+
+Riksdagsmandaten bryts ned till valkretsar med SCB:s rösttal från 2022, skalade
+med partiets nationella prognostrend. För återkommande toppnamn används en
+2022-proxy för var de blev invalda: partiets faktiska 2022-mandat fördelas per
+valkrets och toppnamnen på respektive lista får företräde i samma valkrets 2026.
+Personröster används ännu inte för personvalsgenombrott.
 
 ## Dashboarden
 
