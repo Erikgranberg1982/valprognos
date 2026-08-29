@@ -34,6 +34,39 @@ STANDARD_FULLMAKTIGE = 41
 # eftersom kommunfullmäktige är mindre och mandatkvoten därmed lägre.
 OVRIGA_EFFEKTIV_SPARR = 3.5
 
+# Småpartispärren i kommunvalet beror på valkretsindelningen: tre procent i en
+# kommun med flera valkretsar, två procent i en kommun med en enda. Sjutton av
+# 290 kommuner är valkretsindelade. Källa: vallagen och Valmyndigheten.
+#
+# Regeln är tydligt synlig i utfallet 2022. Av partierna som landade mellan två
+# och tre procent fick 154 av 158 mandat i enkretskommuner, men noll av åtta i
+# de valkretsindelade.
+SPARR_EN_VALKRETS = 2.0
+SPARR_FLERA_VALKRETSAR = 3.0
+
+
+def _valkretsindelning() -> dict[str, int]:
+    """Antal valkretsar per kommun, från data/kommun_valkretsar.csv."""
+    from pathlib import Path
+    fil = Path(__file__).resolve().parent.parent / "data" / "kommun_valkretsar.csv"
+    if not fil.exists():
+        return {}
+    try:
+        tabell = pd.read_csv(fil, dtype={"kommunkod": str})
+    except Exception:
+        return {}
+    return {str(r["kommunkod"]).zfill(4): int(r["antal_valkretsar"])
+            for _, r in tabell.iterrows()}
+
+
+VALKRETSAR = _valkretsindelning()
+
+
+def sparr_for_kommun(kommunkod: str) -> float:
+    """Småpartispärren i procent för en kommun."""
+    antal = VALKRETSAR.get(str(kommunkod).zfill(4), 1)
+    return (SPARR_FLERA_VALKRETSAR if antal > 1 else SPARR_EN_VALKRETS)
+
 # SCB:s partisympatiundersökning används inte på kommunnivå. Undersökningen är
 # indelad i tio landsdelar, vilket är för grovt för en enskild kommun:
 # Västsverige rymmer både Göteborg och Öckerö, som röstar helt olika. Ett
@@ -226,7 +259,8 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
 
 
 
-def fordela_kommunmandat(stod: dict[str, float], platser: int) -> dict[str, int]:
+def fordela_kommunmandat(stod: dict[str, float], platser: int,
+                         sparr: float = SPARR_EN_VALKRETS) -> dict[str, int]:
     """Fördelar fullmäktiges mandat med jämkade uddatalsmetoden.
 
     Kommunvalet saknar procentspärr. Kommuner som inte är valkretsindelade
@@ -237,7 +271,7 @@ def fordela_kommunmandat(stod: dict[str, float], platser: int) -> dict[str, int]
     # samlat stöd på några få procent betyder ändå sällan mandat för alla.
     kvalificerade = {}
     for parti, varde in stod.items():
-        grans = OVRIGA_EFFEKTIV_SPARR if parti == "ÖVRIGA" else 2.0
+        grans = OVRIGA_EFFEKTIV_SPARR if parti == "ÖVRIGA" else sparr
         if varde >= grans:
             kvalificerade[parti] = varde
     if not kvalificerade:
@@ -287,7 +321,7 @@ def sammanfatta(prognos: pd.DataFrame, storlekar: dict[str, int] | None = None) 
         lokalt = rad.get("lokalt_parti")
         if lokalt and np.isfinite(rad.get("lokalt_stod", np.nan)):
             stod[str(lokalt)] = float(rad["lokalt_stod"])
-        mandat = fordela_kommunmandat(stod, platser)
+        mandat = fordela_kommunmandat(stod, platser, sparr_for_kommun(omrade))
         # Mandat per parti inklusive ett namngivet lokalt parti, för lägesanalysen.
         stod_mandat = {k: int(v) for k, v in mandat.items()}
 

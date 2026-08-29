@@ -313,6 +313,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
         for p in partier)
     metod_html = _metod_lokal()
     lokala_matningar_html = _lokala_matningar_html(regioner, kommuner)
+    valkretsar_html = _valkretsar_html()
 
     html = f"""
 <div id="lokalvy" hidden>
@@ -347,6 +348,8 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
   {lokala_matningar_html}
 
   {metod_html}
+
+  {valkretsar_html}
 </div>
 """
     kommun_json = json.dumps(kommundata, ensure_ascii=False, separators=(",", ":"))
@@ -569,6 +572,64 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
 sätt som SCB:s partisympatiundersökning i regionprognosen, men med högre vikt
 eftersom de gäller exakt det område de används på. Vikten halveras på
 {cfg.LOKAL_MATNING_HALVERINGSTID:.0f} dagar.</div>
+"""
+
+
+
+def _valkretsar_html() -> str:
+    """Redovisar valkretsindelningen och resultatet per valkrets 2022.
+
+    Sjutton kommuner är indelade i flera valkretsar, vilket höjer
+    småpartispärren från två till tre procent. Skillnaden avgör om små partier
+    får mandat, så indelningen förtjänar en egen redovisning.
+
+    Resultatet per valkrets är utfallet 2022 från Valmyndighetens rådata.
+    Prognosen görs på kommunnivå, eftersom mandaten fördelas proportionellt
+    över hela kommunen genom utjämningsmandat.
+    """
+    fil = ROT / "data" / "kommun_valkretsresultat.csv"
+    if not fil.exists():
+        return ""
+    try:
+        tabell = pd.read_csv(fil, dtype={"kommunkod": str})
+    except Exception:
+        return ""
+    if tabell.empty:
+        return ""
+
+    rader = []
+    for kommun, grupp in tabell.groupby("kommun", sort=True):
+        antal = len(grupp)
+        for i, (_, rad) in enumerate(grupp.iterrows()):
+            celler = "".join(
+                f'<td class="tal">{rad[p]:.1f}</td>' if pd.notna(rad[p])
+                else '<td class="tal dim">–</td>' for p in cfg.PARTIER
+            )
+            kommuncell = (f'<td class="inst" rowspan="{antal}">{kommun}'
+                          f'<div class="matningsmeta">{antal} valkretsar · '
+                          f'3 % spärr</div></td>' if i == 0 else "")
+            rader.append(f'<tr>{kommuncell}'
+                         f'<td>{rad["valkretsnamn"]}</td>{celler}</tr>')
+
+    partihuvud = "".join(f'<th class="tal">{p}</th>' for p in cfg.PARTIER)
+
+    return f"""
+<h2 id="valkretsar">Valkretsar</h2>
+<div class="sektionsrubrik">Kommuner med flera valkretsar</div>
+<div class="tabellwrap"><table>
+  <thead><tr><th>Kommun</th><th>Valkrets</th>{partihuvud}</tr></thead>
+  <tbody>{''.join(rader)}</tbody>
+</table></div>
+<div class="notis">En kommun med fler än 6 000 röstberättigade får delas in i
+flera valkretsar. Det höjer småpartispärren från två till tre procent, vilket
+avgör om små partier får mandat: i valet 2022 fick partier mellan två och tre
+procent mandat i 154 av 158 fall i kommuner med en valkrets, men i noll av åtta
+fall i de valkretsindelade.
+
+Nio tiondelar av mandaten fördelas inom valkretsarna och resten är
+utjämningsmandat som gör fördelningen proportionell över hela kommunen.
+Prognosen räknar därför på kommunnivå, med rätt spärr för varje kommun.
+Siffrorna nedan är utfallet 2022 per valkrets, från Valmyndighetens rådata.</div>
 """
 
 
