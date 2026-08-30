@@ -1552,8 +1552,12 @@ partiet högre än konsensus. Modellen korrigerar bort
   <strong>Om modellen.</strong> Mätningarna viktas efter institutets kvalitet,
   urvalsstorlek och färskhet (halveringstid {cfg.HALVERINGSTID_DAGAR:.0f} dagar),
   justeras för husfaktorer och körs genom {sim_text} simulerade
-  valutfall. Mandaten fördelas med jämkade uddatalsmetoden och fyraprocentsspärren.
-  Osäkerheten är kalibrerad mot valet 2022, där modellen hade ett medelabsolutfel
+  valutfall. Mandaten fördelas med jämkade uddatalsmetoden och fyraprocentsspärren,
+  räknat på riket som en valkrets. I verkligheten fördelas 310 fasta mandat i 29
+  valkretsar och 39 utjämningsmandat korrigerar avvikelsen. Utjämningen räcker
+  inte alltid hela vägen: mot 2018 och 2022 träffar förenklingen exakt, men 2010
+  och 2014 hade den gett små partier några mandat för mycket på de storas
+  bekostnad. Osäkerheten är kalibrerad mot valet 2022, där modellen hade ett medelabsolutfel
   på 0,73 procentenheter och gav vänsterblocket 174 mandat mot faktiska 173.
   Kalibreringen vilar på en enda valcykel och bör tolkas med det i åtanke.<br>
   <strong>Källa.</strong> Opinionsmätningar sammanställda på svenska Wikipedia.

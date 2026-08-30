@@ -29,7 +29,12 @@ BLOCKNAMN = {"vanster": "V+S+MP+C", "hoger": "L+M+KD+SD"}
 
 SPARRGRANS = 0.04   # 4 % riksspärr
 MANDAT_TOTALT = 349
-FASTA_MANDAT = 310  # resten är utjämningsmandat
+# 310 fasta mandat i 29 valkretsar plus 39 utjämningsmandat. Modellen räknar
+# på riket som en valkrets och använder därför inte uppdelningen, men den är
+# dokumenterad här eftersom den förklarar varför fördelningen kan avvika ett
+# par mandat från ett faktiskt valutfall.
+FASTA_MANDAT = 310
+UTJAMNINGSMANDAT = MANDAT_TOTALT - FASTA_MANDAT
 
 # Riksdagsvalet har två vägar till mandat: fyra procent i hela landet, eller
 # tolv procent i en enskild valkrets. Den andra vägen används i praktiken bara
