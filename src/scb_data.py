@@ -9,6 +9,7 @@ Två datakällor används:
 """
 from __future__ import annotations
 
+import csv as _csv
 import json
 from pathlib import Path
 
@@ -257,12 +258,39 @@ def hamta_riksdagsval_per_kommun(ar: list[str] | None = None,
     return _andelar(df.dropna(subset=["parti"]))
 
 
-def hamta_fullmaktigestorlek(ar: str = "2022", tvinga: bool = False) -> dict[str, int]:
-    """Antal mandat i varje kommunfullmäktige, summerat från valresultatet.
+def _beslutade_storlekar(niva: str = "kommun") -> dict[str, int]:
+    """Fullmäktigestorlekar som gäller i valet 2026, enligt Valmyndigheten.
 
-    Storleken beslutas av kommunen själv utifrån antalet röstberättigade, så
-    den måste läsas ur data snarare än beräknas.
+    Varje kommun beslutar själv hur många ledamöter fullmäktige ska ha, och
+    beslutet ska fattas före mars månad valåret. Trettiotvå kommuner ändrade
+    sin storlek inför 2026: Filipstad minskade från 37 till 25 och Tyresö ökade
+    från 51 till 61. SCB publicerar storlekarna först efter valet, så siffrorna
+    är hämtade ur Valmyndighetens fil över fasta valkretsmandat.
     """
+    fil = ROT / "data" / "fullmaktigestorlek_2026.csv"
+    if not fil.exists():
+        return {}
+    ut = {}
+    with open(fil, encoding="utf-8") as f:
+        for rad in _csv.DictReader(f):
+            if (rad.get("niva") or "").strip() != niva:
+                continue
+            kod = (rad.get("omrade_kod") or "").strip()
+            try:
+                ut[kod] = int(rad["mandat_2026"])
+            except (KeyError, TypeError, ValueError):
+                continue
+    return ut
+
+
+def hamta_fullmaktigestorlek(ar: str = "2022", tvinga: bool = False) -> dict[str, int]:
+    """Antal mandat i varje kommunfullmäktige.
+
+    För valet 2026 används Valmyndighetens beslutade storlekar. Saknas en
+    kommun där faller den tillbaka på storleken i förra valet, summerad ur
+    SCB:s valresultat.
+    """
+    beslutade = _beslutade_storlekar("kommun")
     koder = _kommunkoder("ME0104/ME0104A/ME0104T1")
     q = [
         {"code": "Region", "selection": {"filter": "item", "values": koder}},
@@ -273,9 +301,11 @@ def hamta_fullmaktigestorlek(ar: str = "2022", tvinga: bool = False) -> dict[str
     data = _post("ME0104/ME0104A/Kfmandat", q, f"kf_mandat_{ar}", tvinga)
     df = _till_dataframe(data, ["omrade", "parti", "ar"])
     if df.empty:
-        return {}
+        return dict(beslutade)
     summa = df.groupby("omrade")["varde"].sum()
-    return {k: int(v) for k, v in summa.items() if v > 0}
+    ur_scb = {k: int(v) for k, v in summa.items() if v > 0}
+    ur_scb.update(beslutade)
+    return ur_scb
 
 
 def hamta_regionmandat(ar: str = "2022", tvinga: bool = False) -> dict[str, int]:
