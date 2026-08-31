@@ -7,6 +7,7 @@ mellan flera namnvalsedlar inom samma parti är ännu okända.
 """
 from __future__ import annotations
 
+import csv
 import re
 from pathlib import Path
 import zipfile
@@ -974,6 +975,82 @@ def _rd_listor_i_valkrets(listor: pd.DataFrame, valkretsnamn: str) -> pd.DataFra
     return listor
 
 
+def _fasta_valkretsmandat() -> dict[str, int]:
+    """Antal fasta mandat per riksdagsvalkrets 2026, enligt Valmyndigheten.
+
+    310 av riksdagens 349 mandat är fasta valkretsmandat. Resten är
+    utjämningsmandat. Fördelningen mellan valkretsar räknas om inför varje val
+    efter antalet röstberättigade.
+    """
+    fil = ROT / "data" / "riksdagsvalkretsar_mandat.csv"
+    if not fil.exists():
+        return {}
+    ut = {}
+    with open(fil, encoding="utf-8") as f:
+        for rad in csv.DictReader(f):
+            namn = (rad.get("valkrets") or "").strip()
+            try:
+                ut[namn] = int(rad["fasta_2026"])
+            except (KeyError, TypeError, ValueError):
+                continue
+    return ut
+
+
+def _fordela_riksdagsmandat(vikter_per_valkrets: dict[str, dict[str, float]],
+                            partimandat: dict[str, int],
+                            fasta: dict[str, int],
+                            valkretsnamn: dict[str, str]) -> dict[tuple[str, str], int]:
+    """Fördelar riksdagens mandat enligt vallagen 14 kap.
+
+    Två steg. Först fördelas varje valkrets fasta mandat mellan partierna med
+    jämkade uddatalsmetoden. Sedan tilldelas utjämningsmandaten: varje parti
+    får så många som behövs för att nå sin riksproportionella andel, och varje
+    mandat går till den valkrets där partiets jämförelsetal är störst.
+
+    Jämförelsetalet är partiets röstetal i valkretsen delat med nästa udda
+    divisor. Har partiet inget fast mandat där används hela röstetalet odelat,
+    vilket är själva poängen med utjämningen: den lyfter partier som är
+    utspridda utan att vara störst någonstans.
+
+    Rekonstruerar valet 2022 exakt, alla 349 mandat rätt valkrets.
+    """
+    resultat: dict[tuple[str, str], int] = {}
+
+    # Steg 1: de fasta valkretsmandaten.
+    for kod, namn in valkretsnamn.items():
+        platser = fasta.get(namn, 0)
+        if platser <= 0:
+            continue
+        stod = {p: vikter_per_valkrets.get(p, {}).get(kod, 0.0)
+                for p in partimandat if partimandat[p] > 0}
+        if not any(stod.values()):
+            continue
+        for parti, antal in _fordela_mandat(pd.Series(stod), platser).items():
+            if antal:
+                resultat[(parti, kod)] = antal
+
+    # Steg 2: utjämningsmandaten, ett i taget till högsta jämförelsetal.
+    for parti, mal in partimandat.items():
+        if mal <= 0:
+            continue
+        tilldelade = sum(n for (p, _), n in resultat.items() if p == parti)
+        for _ in range(max(0, mal - tilldelade)):
+            basta, basta_kvot = None, -1.0
+            for kod in valkretsnamn:
+                roster = vikter_per_valkrets.get(parti, {}).get(kod, 0.0)
+                if roster <= 0:
+                    continue
+                har = resultat.get((parti, kod), 0)
+                kvot = roster if har == 0 else roster / (2 * har + 1)
+                if kvot > basta_kvot:
+                    basta_kvot, basta = kvot, kod
+            if basta is None:
+                break
+            resultat[(parti, basta)] = resultat.get((parti, basta), 0) + 1
+
+    return {k: v for k, v in resultat.items() if v > 0}
+
+
 def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
                                  index: VallisteIndex,
                                  omrade: str | None = None) -> pd.DataFrame:
@@ -1004,6 +1081,15 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
     except Exception:
         rostbas = pd.DataFrame()
 
+    # Vallagens tvåstegsfördelning behöver alla partiers vikter samtidigt,
+    # eftersom de fasta mandaten fördelas valkrets för valkrets.
+    fasta = _fasta_valkretsmandat()
+    valkretsnamn = {str(vk["valkretskod"]): vk["valkretsnamn"]
+                    for _, vk in valkretsar.iterrows()}
+    alla_vikter: dict[str, dict[str, float]] = {}
+    listor_per_parti: dict[str, dict] = {}
+    metod_per_parti: dict[str, str] = {}
+
     for parti, antal_partimandat in partimandat.items():
         if antal_partimandat <= 0:
             continue
@@ -1028,10 +1114,38 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
                 vikter[kod] = float(listor["antal_valsedlar"].sum()) if not listor.empty else 0.0
             valkretsmetod = "valsedelsupplaga_proxy"
 
-        vk_mandat = _fordela_mandat(pd.Series(vikter), antal_partimandat)
+        alla_vikter[parti] = {str(k): float(x) for k, x in vikter.items()}
+        listor_per_parti[parti] = listor_per_vk
+        metod_per_parti[parti] = valkretsmetod
+
+    # Fördelningen görs för alla partier samtidigt enligt vallagen: fasta
+    # valkretsmandat först, sedan utjämning efter jämförelsetal.
+    if fasta:
+        samlat = _fordela_riksdagsmandat(alla_vikter, partimandat, fasta,
+                                         valkretsnamn)
+        valkretsmetod_alla = "vallagen_fast_plus_utjamning"
+    else:
+        samlat = {}
+        for parti, antal_partimandat in partimandat.items():
+            if antal_partimandat <= 0:
+                continue
+            for kod, antal in _fordela_mandat(
+                    pd.Series(alla_vikter.get(parti, {})),
+                    antal_partimandat).items():
+                if antal:
+                    samlat[(parti, str(kod))] = antal
+        valkretsmetod_alla = "riksproportionell"
+
+    for parti, antal_partimandat in partimandat.items():
+        if antal_partimandat <= 0:
+            continue
+        listor_per_vk = listor_per_parti.get(parti, {})
+        valkretsmetod = metod_per_parti.get(parti, valkretsmetod_alla)
+        if fasta:
+            valkretsmetod = f"{valkretsmetod}+{valkretsmetod_alla}"
         for _, vk in valkretsar.iterrows():
             kod = vk["valkretskod"]
-            antal = vk_mandat.get(kod, 0)
+            antal = samlat.get((parti, str(kod)), 0)
             if antal <= 0:
                 continue
             rader.append({
