@@ -452,10 +452,11 @@ def _metod_lokal() -> str:
 <div class="sektionsrubrik">Så beräknas region och kommun</div>
 
 <div class="metodkort">
-  <p class="metodingress">Det finns inga publicerade opinionsmätningar för
-  region- och kommunvalen. Prognosen bygger därför på områdets eget resultat i
-  förra lokalvalet, skalat med rikstrenden. Osäkerheten är omkring dubbelt så
-  stor som för riksdagsvalet.</p>
+  <p class="metodingress">Opinionsmätningar för region- och kommunvalen är
+  sällsynta. För de få områden där en fullständig mätning finns vägs den in med
+  hög vikt, se tabellen ovan. För övriga bygger prognosen på områdets eget
+  resultat i förra lokalvalet, skalat med rikstrenden. Osäkerheten är omkring
+  dubbelt så stor som för riksdagsvalet.</p>
 
   <div class="metodsteg">
     <div class="steg">
