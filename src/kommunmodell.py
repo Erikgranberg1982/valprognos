@@ -260,17 +260,26 @@ def _dela_ut_lokala_partier(df: pd.DataFrame, niva: str,
 
 
 def fordela_kommunmandat(stod: dict[str, float], platser: int,
-                         sparr: float = SPARR_EN_VALKRETS) -> dict[str, int]:
+                         sparr: float = SPARR_EN_VALKRETS,
+                         ovriga_tak: int | None = None) -> dict[str, int]:
     """Fördelar fullmäktiges mandat med jämkade uddatalsmetoden.
 
     Kommunvalet saknar procentspärr. Kommuner som inte är valkretsindelade
     tillämpar i stället en spärr på två procent.
+
+    ÖVRIGA är inte ett parti utan en hög av småpartier som var för sig måste
+    klara spärren. I Stockholm och Malmö summerar de till fyra à fem procent
+    utan att något enskilt parti kommer i närheten av ett mandat: båda gav noll
+    mandat till övriga 2022. Med `ovriga_tak` kan antalet mandat till ÖVRIGA
+    begränsas, och tak noll spärrar dem helt.
     """
     # ÖVRIGA rymmer flera lokala partier som var för sig måste nå en mandatkvot.
     # I kommunvalet är den kvoten låg, eftersom fullmäktige är litet, men ett
     # samlat stöd på några få procent betyder ändå sällan mandat för alla.
     kvalificerade = {}
     for parti, varde in stod.items():
+        if parti == "ÖVRIGA" and ovriga_tak == 0:
+            continue
         grans = OVRIGA_EFFEKTIV_SPARR if parti == "ÖVRIGA" else sparr
         if varde >= grans:
             kvalificerade[parti] = varde
@@ -384,7 +393,15 @@ def sammanfatta(prognos: pd.DataFrame, storlekar: dict[str, int] | None = None) 
         lokalt = rad.get("lokalt_parti")
         if lokalt and np.isfinite(rad.get("lokalt_stod", np.nan)):
             stod[str(lokalt)] = float(rad["lokalt_stod"])
-        mandat = fordela_kommunmandat(stod, platser, sparr_for_kommun(omrade))
+        # Saknade kommunen helt lokala mandat i förra valet spärras ÖVRIGA.
+        # Ett namngivet lokalt parti med egen mätning berörs inte, eftersom
+        # det prövas som eget parti ovan.
+        tak = None
+        if forra_mandat and not lokalt:
+            if forra_mandat.get(omrade, {}).get("ÖVRIGA", 0) == 0:
+                tak = 0
+        mandat = fordela_kommunmandat(stod, platser, sparr_for_kommun(omrade),
+                                      ovriga_tak=tak)
         # Mandat per parti inklusive ett namngivet lokalt parti, för lägesanalysen.
         stod_mandat = {k: int(v) for k, v in mandat.items()}
 
