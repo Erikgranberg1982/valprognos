@@ -580,9 +580,14 @@ def _lokala_matningar_html(regioner=None, kommuner=None) -> str:
                 "riksdagsvalkrets": "Riksdagsval i valkretsen"}
 
     rader = []
+    # Varje mätning redovisas för sig. Ett område kan ha mätts flera gånger,
+    # och prognosen använder bara den nyaste, men de äldre är ändå underlag
+    # läsaren bör kunna se.
+    if "datum" in tabell.columns:
+        tabell = tabell.sort_values("datum", ascending=False)
     for _, rad in tabell.iterrows():
-        matning = lokala_partier.matning_for_omrade(rad["niva"], rad["omrade_kod"])
-        if matning is None or not matning["anvands"]:
+        matning = lokala_partier.beskriv_matning(rad)
+        if not matning["anvands"]:
             continue
 
         celler = []

@@ -115,13 +115,31 @@ def matning_for_omrade(niva: str, omrade_kod: str) -> dict | None:
     if traff.empty:
         return None
 
+    # Nyaste mätningen gäller. Filordningen är inte kronologisk, och ett område
+    # kan ha mätts flera gånger: Göteborg har både Indikator i april och Novus
+    # i september.
+    if "datum" in traff.columns:
+        traff = traff.sort_values("datum", ascending=False)
     rad = traff.iloc[0]
+    return beskriv_matning(rad)
+
+
+def beskriv_matning(rad) -> dict:
+    """Beskriver en enskild mätningsrad.
+
+    Ett område kan ha mätts flera gånger. Sidan redovisar alla mätningar,
+    medan prognosen bara använder den nyaste, så tolkningen av en rad måste gå
+    att göra oberoende av vilken som gäller.
+    """
     partier = {p: float(rad[p]) for p in cfg.PARTIER if np.isfinite(rad[p])}
     saknade = [p for p in cfg.PARTIER if p not in partier]
     fullstandig = not saknade
 
     return {
         "id": rad["id"],
+        "niva": rad["niva"],
+        "omrade_kod": rad["omrade_kod"],
+        "omrade_namn": rad["omrade_namn"],
         "institut": rad["institut"],
         "uppdragsgivare": rad["uppdragsgivare"],
         "urval": rad["urval"],
