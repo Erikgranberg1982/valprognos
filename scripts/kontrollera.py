@@ -147,6 +147,23 @@ def main() -> None:
         if kb < minsta:
             fel(f"{namn} är bara {kb:.0f} kB, väntat minst {minsta} kB.")
 
+    # Nedräkningen ska följa kalendern. Den räknades tidigare från senaste
+    # mätningens datum och frös därför så snart mätningarna glesnade.
+    import re as _re
+    vantat = (pd.Timestamp(_cfg_datum.VALDAG) - pd.Timestamp.now().normalize()).days
+    for namn in ("index.html", "partier_2026.html", "scenarier_2026.html"):
+        sida = ROT / "output" / namn
+        if not sida.exists():
+            continue
+        txt = sida.read_text(encoding="utf-8")
+        visade = {int(x) for x in _re.findall(r"(\d+)\s*dagar till valdagen", txt)}
+        visade |= {int(x) for x in _re.findall(
+            r">(\d+)</div>\s*<div class=\"e\">dagar till valdagen", txt)}
+        avvikande = {v for v in visade if abs(v - vantat) > 1}
+        if avvikande:
+            fel(f"{namn} visar {sorted(avvikande)} dagar till valdagen, "
+                f"väntat {vantat}.")
+
     print(f"Kontroll godkänd: {len(df)} mätningar från {institut} institut, "
           f"senaste {df['datum'].max().date()}.")
     print(f"  Prognos: " + ", ".join(f"{p} {snitt[p]:.1f}" for p in PARTIER))

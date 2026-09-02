@@ -39,8 +39,18 @@ def las_matningar(fil: Path) -> pd.DataFrame:
 
 
 def kor_prognos(df: pd.DataFrame, referensdatum: date, valdag: date,
-                korrigera: bool | None = None) -> dict:
-    """Kör hela modellkedjan och returnerar alla delresultat."""
+                korrigera: bool | None = None,
+                idag: date | None = None) -> dict:
+    """Kör hela modellkedjan och returnerar alla delresultat.
+
+    `referensdatum` styr viktningen av mätningar och kan ligga i det förflutna,
+    till exempel i ett backtest. Nedräkningen till valdagen och simuleringens
+    drift utgår i stället från `idag`, som annars fryser på senaste mätningens
+    datum: den 2 september med senaste mätning den 30 augusti visade sidan
+    fjorton dagar kvar i stället för elva.
+    """
+    if idag is None:
+        idag = referensdatum
     husfaktorer = modell.skatta_husfaktorer(df, referensdatum)
     justerad = modell.justera_for_husfaktor(df, husfaktorer)
 
@@ -50,7 +60,7 @@ def kor_prognos(df: pd.DataFrame, referensdatum: date, valdag: date,
     snitt = modell.viktat_snitt(aktuell, referensdatum)
     snitt = modell.tillampa_valdagskorrigering(snitt, korrigera)
 
-    dagar_kvar = max((valdag - referensdatum).days, 0)
+    dagar_kvar = max((valdag - idag).days, 0)
     sim = modell.simulera(snitt, dagar_kvar)
 
     return {
@@ -353,7 +363,9 @@ def main() -> None:
     referensdatum = min(df["datum"].max().date(), date.today())
 
     korrigera = True if args.korrigera else None
-    res = kor_prognos(df, referensdatum, valdag, korrigera=korrigera)
+    # Nedräkningen ska följa kalendern, inte senaste mätningens datum.
+    res = kor_prognos(df, referensdatum, valdag, korrigera=korrigera,
+                      idag=date.today())
 
     if args.kandidater:
         import vallistor
