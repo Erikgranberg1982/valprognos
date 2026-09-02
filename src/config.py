@@ -210,6 +210,13 @@ REGERINGSALTERNATIV = [
         "krav": {"minst": {"C": 0.04}},
     },
     {
+        "id": "s_c_kd",
+        "namn": "S+C+KD",
+        "partier": ["S", "C", "KD"],
+        "beskrivning": "Mittenregering över blockgränsen där KD lämnar Tidösamarbetet, utan MP.",
+        "krav": {"minst": {"C": 0.04, "KD": 0.04}},
+    },
+    {
         "id": "s_c_kd_mp",
         "namn": "S+C+KD+MP",
         "partier": ["S", "C", "KD", "MP"],

@@ -1,5 +1,5 @@
 parameter,varde,kommentar
-halveringstid_dagar,21,Antal dagar innan en mätnings tidsvikt halveras. Med 21 dagar behåller en mätning cirka 79 procent av sin vikt per vecka. Lägre värde gör prognosen mer reaktiv men bygger på färre effektiva mätningar.
+halveringstid_dagar,21,Antal dagar innan en mätnings tidsvikt halveras. Backtest mot 2018 och 2022 visar att kortare halveringstid ger sämre träffsäkerhet på alla avstånd till valdagen: 7 dagar ger effektivt 5,6 mätningar i snittet mot 10,1 vid 21 dagar, och bruset från enskilda institut väger då tyngre än den färskare informationen. Längre än 21 mätte marginellt bättre men gör prognosen trögare mot en verklig sen rörelse, vilket 2018 visar att det finns.
 max_alder_dagar,365,Mätningar äldre än så här exkluderas helt.
 husfaktor_fonster_dagar,540,Tidsfönster bakåt för att skatta husfaktorer per institut.
 husfaktor_dampning,0.75,Andel av skattad husfaktor som faktiskt korrigeras bort. 1.0 = full korrigering.
