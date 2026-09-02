@@ -116,30 +116,34 @@ redan ligger uppe påverkas inte.**
 
 ## Publicera till app.lysio.se
 
-GitHub Pages uppdateras av sig självt. Din egen server gör det inte.
+GitHub Pages uppdateras av sig självt varje natt. Din egen server gör det inte.
 
 ```bash
-cd "/Users/erikgranberg/Desktop/Python/Election prediction/src"
-python3 prognos.py --hamta
-cd ..
-cp output/index.html output/partier_2026.html \
-   output/ledamoter_2026.html output/scenarier_2026.html \
-   output/*.json output/*.csv publicering/
+cd "/Users/erikgranberg/Desktop/Python/Election prediction"
+python3 src/prognos.py --hamta
 python3 scripts/publicera_server.py
 ```
 
-Skriptet laddar upp de sex filer sidan behöver till
+Två kommandon. Det första hämtar nya mätningar och bygger om sidan, det andra
+laddar upp den.
+
+Skriptet skickar de sex filer sidan behöver från `output/` till
 `/var/www/html/valprognos` över SFTP och lämnar övrigt i katalogen orört.
-Varje fil skickas till ett tillfälligt namn och byts in när den är komplett,
-så att en besökare aldrig hämtar en halv sida.
+Varje fil laddas upp under ett tillfälligt namn och byts in när den är
+komplett, så att en besökare aldrig hämtar en halv sida.
 
 `--torrkor` visar vad som skulle laddas upp utan att göra det.
+`--katalog publicering` laddar upp från publiceringsmappen i stället.
 
 Inloggningsuppgifterna läses ur `.env` och skrivs aldrig ut. Den filen är
 gitignorerad och ska aldrig versionshanteras.
 
-CSV-filerna i `publicering/` behöver inte upp. Ingen sida läser dem, de ligger
-där som granskningsunderlag.
+Ändrar du en modellparameter eller lägger in en lokal mätning räcker det med
+samma två kommandon. Rör du kandidatdatan behövs ett steg till:
+
+```bash
+python3 src/prognos.py --kandidater --tvinga-vallistor
+```
 
 ## Vanliga fel
 

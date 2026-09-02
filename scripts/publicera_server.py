@@ -5,7 +5,7 @@ GitHub Pages uppdateras av sig självt varje natt. Den egna servern gör det
 inte, utan kräver en uppladdning. Skriptet skickar de sex filer sidan behöver
 och lämnar övrigt i katalogen orört.
 
-    python3 scripts/publicera_server.py            # ladda upp
+    python3 scripts/publicera_server.py            # ladda upp från output/
     python3 scripts/publicera_server.py --torrkor  # visa vad som skulle göras
 
 Inloggningsuppgifterna läses ur .env i projektroten och skrivs aldrig ut.
@@ -55,8 +55,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Publicera till app.lysio.se")
     ap.add_argument("--torrkor", action="store_true",
                     help="Visa vad som skulle laddas upp utan att göra det")
-    ap.add_argument("--katalog", default=str(ROT / "publicering"),
-                    help="Katalog att ladda upp från")
+    ap.add_argument("--katalog", default=str(ROT / "output"),
+                    help="Katalog att ladda upp från (standard: output)")
     args = ap.parse_args()
 
     kalla = Path(args.katalog)
