@@ -121,16 +121,25 @@ GitHub Pages uppdateras av sig självt. Din egen server gör det inte.
 ```bash
 cd "/Users/erikgranberg/Desktop/Python/Election prediction/src"
 python3 prognos.py --hamta
-cp ../output/index.html ../output/partier_2026.html \
-   ../output/ledamoter_2026.html ../output/scenarier_2026.html \
-   ../output/*.json ../output/*.csv ../publicering/
+cd ..
+cp output/index.html output/partier_2026.html \
+   output/ledamoter_2026.html output/scenarier_2026.html \
+   output/*.json output/*.csv publicering/
+python3 scripts/publicera_server.py
 ```
 
-Ladda sedan upp innehållet i `publicering/` till `/valprognos/` på servern.
-Alla filer måste ligga i samma mapp, eftersom sidorna länkar till varandra med
-relativa sökvägar.
+Skriptet laddar upp de sex filer sidan behöver till
+`/var/www/html/valprognos` över SFTP och lämnar övrigt i katalogen orört.
+Varje fil skickas till ett tillfälligt namn och byts in när den är komplett,
+så att en besökare aldrig hämtar en halv sida.
 
----
+`--torrkor` visar vad som skulle laddas upp utan att göra det.
+
+Inloggningsuppgifterna läses ur `.env` och skrivs aldrig ut. Den filen är
+gitignorerad och ska aldrig versionshanteras.
+
+CSV-filerna i `publicering/` behöver inte upp. Ingen sida läser dem, de ligger
+där som granskningsunderlag.
 
 ## Vanliga fel
 
