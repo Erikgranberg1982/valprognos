@@ -171,6 +171,16 @@ padding:24px;box-shadow:var(--skugga)}}
 .d{{font-size:14px;font-weight:700;margin-left:7px}}
 .d.upp{{color:var(--gron)}}.d.ned{{color:var(--korall)}}
 canvas{{width:100%;height:auto;display:block}}
+.kort{{position:relative}}
+.tgtip{{position:absolute;z-index:20;background:var(--kort);
+border:1px solid var(--linje);border-radius:10px;padding:9px 12px;
+box-shadow:0 4px 14px rgba(0,61,99,.16);pointer-events:none;min-width:112px}}
+.ttdatum{{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;
+color:var(--svag);font-weight:700;margin-bottom:5px}}
+.ttrad{{display:flex;align-items:center;gap:7px;font-size:13px}}
+.ttp{{width:9px;height:9px;border-radius:2px;flex:none}}
+.ttn{{font-weight:700}}
+.ttv{{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}}
 .vkrad{{display:grid;grid-template-columns:230px 1fr;gap:16px;padding:14px 0;
 border-top:1px solid var(--linje)}}
 .vknamn{{font-weight:700;font-size:14px}}
@@ -298,12 +308,15 @@ function rita(p){{
       '<div class="tl"><div class="n">'+d.valkretsar.length+'</div>'+
         '<div class="e">valkretsar med mandat</div></div>'+
     '</div>'+
-    '<canvas id="tg" height="230"></canvas></div>'+
+    '<canvas id="tg" height="230"></canvas>'+
+    '<div id="tgtip" class="tgtip" hidden></div></div>'+
     '<h2>Var mandaten hamnar</h2>'+
     '<div class="rub">Valkretsar och vilka som tar platserna</div>'+
     '<div class="kort">'+vk+'</div>';
 
+  hover=-1;
   ritaTrend(p);
+  kopplaTrendTip();
 }}
 
 function ritaTrend(p){{
@@ -330,6 +343,71 @@ function ritaTrend(p){{
   g.strokeStyle=d.farg; g.lineWidth=2.4; g.lineJoin='round'; g.beginPath();
   v.forEach(function(t,i){{ i?g.lineTo(x(i),y(t)):g.moveTo(x(i),y(t)) }});
   g.stroke();
+
+  /* Markera den punkt markören står på, så tooltipen har en ankarpunkt. */
+  if (hover >= 0 && hover < n) {{
+    g.strokeStyle=lin; g.lineWidth=1; g.beginPath();
+    g.moveTo(x(hover),mT); g.lineTo(x(hover),mT+bh); g.stroke();
+    g.fillStyle=d.farg; g.beginPath();
+    g.arc(x(hover),y(v[hover]),4.5,0,Math.PI*2); g.fill();
+    g.strokeStyle=st.getPropertyValue('--kort').trim()||'#fff';
+    g.lineWidth=2; g.stroke();
+  }}
+  GEO={{x:x,y:y,n:n,mL:mL,bw:bw}};
+}}
+
+/* Tooltip på trendgrafen: visar datum och partiets stöd vid den punkten. */
+var hover=-1, GEO=null;
+
+function trendIndex(klientX){{
+  var c=document.getElementById('tg');
+  if(!c||!GEO) return -1;
+  var r=c.getBoundingClientRect();
+  var px=(klientX-r.left)*(c.clientWidth/r.width);
+  if(GEO.n<2) return 0;
+  var i=Math.round((px-GEO.mL)/GEO.bw*(GEO.n-1));
+  return (i<0||i>=GEO.n)?-1:i;
+}}
+
+function visaTrendTip(klientX){{
+  var c=document.getElementById('tg'), tip=document.getElementById('tgtip');
+  if(!c||!tip) return;
+  var i=trendIndex(klientX);
+  if(i<0){{ doljTrendTip(); return; }}
+  if(i!==hover){{ hover=i; ritaTrend(valt); }}
+  var d=D[valt], varde=d.trend[i];
+  if(typeof varde!=='number'){{ doljTrendTip(); return; }}
+  tip.innerHTML='<div class="ttdatum">'+(DATUM[i]||'')+'</div>'+
+    '<div class="ttrad"><span class="ttp" style="background:'+d.farg+'"></span>'+
+    '<span class="ttn">'+valt+'</span>'+
+    '<span class="ttv">'+varde.toFixed(1)+'%</span></div>';
+  tip.hidden=false;
+  var r=c.getBoundingClientRect(), px=GEO.x(i)/(c.clientWidth/r.width);
+  var v=px+16;
+  if(v+tip.offsetWidth>r.width-4) v=px-tip.offsetWidth-16;
+  tip.style.left=Math.max(4,v)+'px';
+  tip.style.top='10px';
+}}
+
+function doljTrendTip(){{
+  var tip=document.getElementById('tgtip');
+  if(hover!==-1){{ hover=-1; ritaTrend(valt); }}
+  if(tip) tip.hidden=true;
+}}
+
+function kopplaTrendTip(){{
+  var c=document.getElementById('tg');
+  if(!c || c.dataset.tip) return;
+  c.dataset.tip='1';
+  c.addEventListener('mousemove', function(e){{ visaTrendTip(e.clientX); }});
+  c.addEventListener('mouseleave', doljTrendTip);
+  c.addEventListener('touchstart', function(e){{
+    if(e.touches[0]) visaTrendTip(e.touches[0].clientX);
+  }}, {{passive:true}});
+  c.addEventListener('touchmove', function(e){{
+    if(e.touches[0]) visaTrendTip(e.touches[0].clientX);
+  }}, {{passive:true}});
+  c.addEventListener('touchend', doljTrendTip);
 }}
 
 document.querySelectorAll('.pflik').forEach(function(b){{

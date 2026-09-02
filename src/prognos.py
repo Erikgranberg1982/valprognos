@@ -382,7 +382,9 @@ def main() -> None:
     skriv_terminal(res, df)
 
     if not args.ingen_html:
-        trend = modell.trendserie(res["justerad"])
+        # Grafens högerkant ska visa dagens prognos, inte närmaste
+        # rutnätspunkt före senaste mätningen.
+        trend = modell.trendserie(res["justerad"], slutdatum=date.today())
         matningar = bygg_matningstabell(df, res, referensdatum)
         try:
             import kommunmodell as _km

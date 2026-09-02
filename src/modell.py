@@ -142,10 +142,22 @@ def viktat_snitt(df: pd.DataFrame, referensdatum: date) -> pd.Series:
     return s / s.sum() * 100.0  # Normalisera bort 'Andra'.
 
 
-def trendserie(df: pd.DataFrame, steg_dagar: int = 7) -> pd.DataFrame:
-    """Rullande tidsviktat snitt för hela perioden, för grafen."""
+def trendserie(df: pd.DataFrame, steg_dagar: int = 7,
+               slutdatum: date | None = None) -> pd.DataFrame:
+    """Rullande tidsviktat snitt för hela perioden, för grafen.
+
+    Rutnätet stegar från första mätningen och landar därför sällan på den
+    sista. Slutpunkten läggs till separat så att grafens högerkant visar samma
+    värde som prognosen: utan den slutade kurvan på närmaste rutnätspunkt och
+    missade de senaste mätningarna helt.
+    """
     start, slut = df["datum"].min(), df["datum"].max()
-    punkter = pd.date_range(start + pd.Timedelta(days=30), slut, freq=f"{steg_dagar}D")
+    if slutdatum is not None:
+        slut = max(slut, pd.Timestamp(slutdatum))
+    punkter = list(pd.date_range(start + pd.Timedelta(days=30), slut,
+                                 freq=f"{steg_dagar}D"))
+    if not punkter or punkter[-1] < slut:
+        punkter.append(slut)
     rader = []
     for punkt in punkter:
         histor = df[df["datum"] <= punkt]
