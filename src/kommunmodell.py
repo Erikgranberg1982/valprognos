@@ -393,12 +393,21 @@ def sammanfatta(prognos: pd.DataFrame, storlekar: dict[str, int] | None = None) 
         lokalt = rad.get("lokalt_parti")
         if lokalt and np.isfinite(rad.get("lokalt_stod", np.nan)):
             stod[str(lokalt)] = float(rad["lokalt_stod"])
-        # Saknade kommunen helt lokala mandat i förra valet spärras ÖVRIGA.
-        # Ett namngivet lokalt parti med egen mätning berörs inte, eftersom
-        # det prövas som eget parti ovan.
+        # ÖVRIGA spärras när högen inte kan förklara några mandat.
+        #
+        # Utan namngivet lokalt parti gäller förra valets utfall: saknades
+        # lokala mandat då är ett samlat stöd på några procent nästan alltid
+        # många småpartier som var för sig missar mandatkvoten.
+        #
+        # Med ett namngivet lokalt parti är det partiet redan utbrutet ur
+        # ÖVRIGA och redovisas separat. Då är förra valets ÖVRIGA-mandat i
+        # praktiken det partiets mandat, och att låta resthögen få egna mandat
+        # ovanpå blir en dubbelräkning: Göteborgs fem ÖVRIGA-mandat 2022 var
+        # Demokraterna, som nu får sina fem under eget namn.
         tak = None
-        if forra_mandat and not lokalt:
-            if forra_mandat.get(omrade, {}).get("ÖVRIGA", 0) == 0:
+        if forra_mandat:
+            forra_ovriga = forra_mandat.get(omrade, {}).get("ÖVRIGA", 0)
+            if forra_ovriga == 0 or lokalt:
                 tak = 0
         mandat = fordela_kommunmandat(stod, platser, sparr_for_kommun(omrade),
                                       ovriga_tak=tak)
