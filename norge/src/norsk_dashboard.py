@@ -56,6 +56,36 @@ def _heltal(varde: int) -> str:
     return f"{int(varde):,}".replace(",", "\u00a0")
 
 
+def toppmeny(aktiv: str = "storting", rot: str = "") -> str:
+    """Toppmenyn med de två valen.
+
+    `aktiv` är "storting" eller "lokalvalg". `rot` är den relativa vägen
+    tillbaka till webbplatsens rot, till exempel "../../" från en partisida.
+    Relativa länkar används eftersom sidan ligger i en underkatalog och ska
+    fungera både publicerad och öppnad lokalt.
+    """
+    logo = _logotyp("lysio-logo-farg.png")
+    marke = (f'<img src="{logo}" alt="Lysio Research">' if logo
+             else "<strong>Lysio Research</strong>")
+    # Tom rot betyder att sidan redan ligger i roten. "./" krävs då, en tom
+    # href navigerar ingenstans.
+    hem = rot or "./"
+    val = [
+        ("storting", hem, "Stortingsvalget", "2029"),
+        ("lokalvalg", f"{rot}lokalvalg/", "Lokalvalget", "2027"),
+    ]
+    delar = []
+    for nyckel, adress, namn, ar in val:
+        klass = ' class="aktiv"' if nyckel == aktiv else ""
+        delar.append(f'<a href="{adress}"{klass}>{namn}'
+                     f'<span class="ar">{ar}</span></a>')
+    lankar = "".join(delar)
+    return (f'<div class="topp"><div class="toppinner">'
+            f'<a href="{hem}" aria-label="Lysio Research valgprognose">{marke}</a>'
+            f'<nav class="toppnav" aria-label="Valg">{lankar}</nav>'
+            f'</div></div>')
+
+
 def _logotyp(filnamn: str) -> str:
     """Läser en logotyp från assets/ och returnerar den som data-URI."""
     fil = ROT / "assets" / filnamn
@@ -270,7 +300,26 @@ def _matningstabell(matningar: pd.DataFrame, antal: int = 15) -> str:
 # Sidans CSS, färdig och delad. Partisidorna importerar samma sträng så
 # att de två sidtyperna inte glider ifrån varandra. Färdigrenderad, inte
 # en mall: klamrarna är riktiga CSS-klamrar och färgerna är insatta.
-STIL = """  :root {
+STIL = """
+  /* Toppmeny. Delas av alla sidtyper så att de två valen alltid går att nå. */
+  .topp { background: var(--vit); border-bottom: 1px solid var(--linje);
+          position: sticky; top: 0; z-index: 20; }
+  .toppinner { max-width: 1080px; margin: 0 auto; padding: 11px 20px;
+               display: flex; align-items: center; gap: 22px;
+               flex-wrap: wrap; }
+  .toppinner img { height: 26px; }
+  .toppnav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+  .toppnav a { padding: 7px 14px; border-radius: 8px; text-decoration: none;
+               color: var(--svag); font-size: .92rem; font-weight: 600; }
+  .toppnav a:hover { background: var(--ljusbla); color: var(--text); }
+  .toppnav a.aktiv { background: var(--morkbla); color: #fff; }
+  .toppnav .ar { opacity: .65; font-weight: 500; margin-left: 5px; }
+  @media (max-width: 560px) {
+    .toppinner { gap: 10px; }
+    .toppnav { margin-left: 0; width: 100%; }
+    .toppnav a { flex: 1; text-align: center; padding: 7px 8px; }
+  }
+  :root {
     --korall: #EF7466; --korall-mork: #D95B4C; --morkbla: #003D63;
     --sand: #FAF2E8; --ljusbla: #F1F3FA; --gron: #7DBA74;
     --text: #14232e; --svag: #5d7080; --linje: #e3e8ee; --vit: #fff;
@@ -431,10 +480,10 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
 </style>
 </head>
 <body>
+{toppmeny("storting", "")}
 <div class="omslag">
 
 <header>
-  {'<img src="' + logo + '" alt="Lysio Research">' if logo else '<strong>Lysio Research</strong>'}
   <h1>Valgprognose {valdag.year}</h1>
   <p class="underrubrik">Stortingsvalget {_langt_datum(valdag)}
      &middot; {meta['dagar_kvar']} dager igjen</p>

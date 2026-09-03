@@ -22,6 +22,7 @@ from datetime import date
 from pathlib import Path
 
 import config as cfg
+import lokala_koalitioner as lk
 import lokalmodell
 import norsk_dashboard as nd
 import seo
@@ -133,31 +134,63 @@ def _stapelgraf(data: dict, bredd: int = 860) -> str:
 
 
 def _styre(data: dict) -> tuple[str, str]:
-    """Beskriver mandatläget: vilken sida som är störst och om den har egen majoritet."""
-    mandat = data["mandat"]
-    platser = data["platser"]
-    vanster = sum(mandat.get(p, 0) for p in cfg.BLOCK["vanster"])
-    hoger = sum(mandat.get(p, 0) for p in cfg.BLOCK["hoger"])
-    lokalt = mandat.get(LOKALT, 0)
-    behovs = platser // 2 + 1
+    """Mandatläget i korthet, för nyckeltalskortet och översiktstabellen."""
+    s = lk.sammanfatta(data["mandat"], data["platser"])
+    return s["lage"], s["forklaring"]
 
-    if vanster >= behovs:
-        return ("Rødgrønt flertall",
-                f"Rødgrønn side får {vanster} av {platser} mandater og "
-                f"flertall på egen hånd.")
-    if hoger >= behovs:
-        return ("Borgerlig flertall",
-                f"Borgerlig side får {hoger} av {platser} mandater og "
-                f"flertall på egen hånd.")
-    if lokalt >= behovs:
-        return ("Lokale lister i flertall",
-                f"Lokale lister får {lokalt} av {platser} mandater.")
-    storst = "Rødgrønn" if vanster > hoger else (
-        "Borgerlig" if hoger > vanster else "Ingen")
-    return (f"Vippeposisjon",
-            f"Ingen side får {behovs} mandater alene. {storst} side er størst "
-            f"med {max(vanster, hoger)} mot {min(vanster, hoger)}, og lokale "
-            f"lister har {lokalt}. De avgjør hvem som styrer.")
+
+def _styreavsnitt(data: dict) -> str:
+    """Avsnittet om möjliga styren.
+
+    Redovisar vilka konstellationer som når egen majoritet. Modulen avgör
+    inte vad som är politiskt troligt: lokala styren beror på personer och
+    sakfrågor som ingen modell ser. Det står också i texten.
+    """
+    s = lk.sammanfatta(data["mandat"], data["platser"])
+    if not s["styren"]:
+        innehall = ('<p class="ledtext">Ingen av de vanlige '
+                    'konstellasjonene får flertall i prognosen. Da må styret '
+                    'bygges på en løsning som er spesifikk for dette '
+                    'området.</p>')
+    else:
+        rader = []
+        for st in s["styren"]:
+            partier = "".join(
+                f'<span class="prick" style="background:{_farg(p)}" '
+                f'title="{html_mod.escape(_partinamn(p))}"></span>'
+                for p in st["partier"])
+            marginal = ("på vippen" if st["marginal"] == 0
+                        else f"{st['marginal']} over")
+            rader.append(f"""      <tr>
+        <td><strong>{html_mod.escape(st['namn'])}</strong>
+            <div class="beskrivning">{html_mod.escape(st['beskrivning'])}</div></td>
+        <td class="partiprickar">{partier}</td>
+        <td class="tal"><strong>{st['mandat']}</strong></td>
+        <td class="tal spann">{marginal}</td>
+      </tr>""")
+        innehall = f"""  <div class="tabellhölje">
+    <table>
+      <thead><tr><th>Konstellasjon</th><th>Partier</th>
+        <th class="tal">Mandater</th><th class="tal">Margin</th></tr></thead>
+      <tbody>
+{chr(10).join(rader)}
+      </tbody>
+    </table>
+  </div>"""
+
+    return f"""
+<section>
+  <h2>Mulige styrer</h2>
+  <p class="ledtext">{html_mod.escape(s['forklaring'])} Det trengs
+    {s['behovs']} av {data['platser']} mandater for flertall.</p>
+{innehall}
+  <p class="ledtext" style="margin-top:16px">Tabellen viser hvilke
+    konstellasjoner som får flertall i prognosen, ikke hva som er politisk
+    sannsynlig. Lokale styrer avgjøres av personer og enkeltsaker som ingen
+    modell fanger, og samarbeid over blokkgrensen er vanlig: Senterpartiet
+    styrer med Høyre og Frp i Bergen, og lokale lister sitter i posisjon i et
+    stort antall kommuner.</p>
+</section>"""
 
 
 def _metodavsnitt() -> str:
@@ -166,9 +199,15 @@ def _metodavsnitt() -> str:
   <h2>Slik er prognosen laget</h2>
   <p class="ledtext">Utgangspunktet er områdets eget resultat i lokalvalget
     2023. Hvert partis nivå skaleres med hvor mye partiet har endret seg i
-    riksopinionen siden den gang: et parti som fikk 12,0 prosent i kommunen og
-    siden har gått fra 14,6 til 15,6 prosent nasjonalt, havner på 12,8
-    prosent.</p>
+    riksopinionen siden den gang.</p>
+  <p class="ledtext"><strong>Endringen dempes.</strong> Lokalvalg følger ikke
+    riksopinionen fullt ut: velgerne stemmer på lokale kandidater og lokale
+    saker, og et parti som dobler seg nasjonalt dobler seg ikke i kommunene.
+    Målt på lokalvalgene 2019 til 2023 slår omtrent to tredeler av
+    opinionsbevegelsen gjennom lokalt, og prognosen bruker det. Uten dempingen
+    ville Fremskrittspartiet, som har gått fra 13,9 til 31,0 prosent i
+    riksopinionen siden 2023, havnet på nivåer partiet aldri har vært i
+    nærheten av i et lokalvalg.</p>
   <p class="ledtext"><strong>Lokale lister holdes konstante</strong> på nivået
     fra 2023. De kan ikke prognostiseres: det finnes ingen målinger per
     kommune, og en lokal liste avhenger av personer og enkeltsaker som ikke
@@ -183,8 +222,8 @@ def _metodavsnitt() -> str:
     stortingsprognosen.</strong> Tre grunner: det finnes ingen målinger per
     kommune eller fylke, riksopinionen måler stortingsvalg og ikke lokalvalg,
     og lokale lister holdes konstante. Et backtest der resultatet fra 2019 ble
-    skalert fram til 2023 traff med 1,6 prosentpoeng i snitt per parti på
-    fylkesnivå og 3,6 på kommunenivå. Til sammenligning gir stortingsprognosen
+    skalert fram til 2023 traff med 1,5 prosentpoeng i snitt per parti på
+    fylkesnivå og 3,3 på kommunenivå. Til sammenligning gir stortingsprognosen
     0,7 prosentpoeng en uke før valget.</p>
   <p class="ledtext">Tallene beskriver altså retningen, ikke det presise
     utfallet. Særlig på kommunenivå kan lokale forhold flytte store
@@ -193,7 +232,7 @@ def _metodavsnitt() -> str:
 
 
 def _sidhuvud(titel: str, beskrivning: str, url: str, brodsmulor: list,
-              extra_stil: str = "") -> str:
+              extra_stil: str = "", rot: str = "../") -> str:
     return f"""<!doctype html>
 <html lang="no">
 <head>
@@ -217,6 +256,8 @@ def _sidhuvud(titel: str, beskrivning: str, url: str, brodsmulor: list,
                  border-radius: 8px; padding: 5px 11px; margin: 0 5px 7px 0;
                  text-decoration: none; color: var(--text); font-size: .88rem; }}
   .omradelank:hover {{ background: var(--ljusbla); }}
+  .partiprickar {{ white-space: nowrap; }}
+  .partiprickar .prick {{ margin-right: 3px; }}
   .sokruta {{ width: 100%; max-width: 380px; padding: 9px 13px;
               border: 1px solid var(--linje); border-radius: 9px;
               font-size: .95rem; margin-bottom: 14px; }}
@@ -224,6 +265,7 @@ def _sidhuvud(titel: str, beskrivning: str, url: str, brodsmulor: list,
 </style>
 </head>
 <body>
+{nd.toppmeny("lokalvalg", rot)}
 <div class="omslag">
 """
 
@@ -269,7 +311,8 @@ def bygg_omrade(namn: str, data: dict, niva: str) -> str:
                   ("Lokalvalget 2027", f"{seo.BAS_URL}/lokalvalg/"),
                   (rent, url)]
 
-    return (_sidhuvud(titel, beskrivning, url, brodsmulor) + f"""
+    return (_sidhuvud(titel, beskrivning, url, brodsmulor,
+                      rot="../../../") + f"""
 <nav class="brodsmula"><a href="../../../">Valgprognose</a> &rsaquo;
   <a href="../../">Lokalvalget 2027</a> &rsaquo; {html_mod.escape(rent)}</nav>
 
@@ -320,6 +363,7 @@ def bygg_omrade(namn: str, data: dict, niva: str) -> str:
     </table>
   </div>
 </section>
+{_styreavsnitt(data)}
 {_metodavsnitt()}
 """ + _sidfot())
 
@@ -364,6 +408,23 @@ def bygg_oversikt(fylken: dict, kommuner: dict, riksprognos: dict) -> str:
         <td class="tal">{nd._tal(riksmandat.get(p, 0) / totalt_mandat * 100)}&nbsp;%</td>
         <td class="tal">{nd._tal(trend.get(p, 1.0), 2) if p != LOKALT else 'fast'}</td>
       </tr>""" for p in ORDNING if p in riksmandat)
+
+    # Fördelningen av styrelägen, för översiktstabellen.
+    lagen = ["Rødgrønt flertall", "Borgerlig flertall",
+             "Lokale lister i flertall", "Vippeposisjon"]
+    rakning = {l: {"kommun": 0, "fylke": 0} for l in lagen}
+    for niva, omraden in (("kommun", kommuner), ("fylke", fylken)):
+        for d in omraden.values():
+            lage = lk.sammanfatta(d["mandat"], d["platser"])["lage"]
+            if lage in rakning:
+                rakning[lage][niva] += 1
+    styrerader = "".join(
+        f"""      <tr>
+        <td>{l}</td>
+        <td class="tal"><strong>{rakning[l]['kommun']}</strong></td>
+        <td class="tal">{nd._tal(rakning[l]['kommun'] / max(len(kommuner), 1) * 100)}&nbsp;%</td>
+        <td class="tal">{rakning[l]['fylke']}</td>
+      </tr>""" for l in lagen)
 
     titel = "Prognose lokalvalget 2027"
     beskrivning = (
@@ -412,6 +473,24 @@ def bygg_oversikt(fylken: dict, kommuner: dict, riksprognos: dict) -> str:
         <th class="tal">Andel</th><th class="tal">Endring i opinionen</th></tr></thead>
       <tbody>
 {riksrader}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Styre i kommunene</h2>
+  <p class="ledtext">Hvor mange kommuner hver side får flertall i på egen
+    hånd. Der ingen side rekker fram avgjør lokale lister eller samarbeid
+    over blokkgrensen, og det er vanligere enn blokktenkningen antyder: etter
+    valget 2023 hadde borgerlig side eget flertall i 63 kommuner og rødgrønn
+    side i 148.</p>
+  <div class="tabellhölje">
+    <table>
+      <thead><tr><th>Utfall</th><th class="tal">Kommuner</th>
+        <th class="tal">Andel</th><th class="tal">Fylkesting</th></tr></thead>
+      <tbody>
+{styrerader}
       </tbody>
     </table>
   </div>

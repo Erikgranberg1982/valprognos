@@ -179,6 +179,7 @@ def bygg(parti: str, rad, sammanfattning: pd.DataFrame, trend: pd.DataFrame,
 </style>
 </head>
 <body>
+{nd.toppmeny("storting", "../../")}
 <div class="omslag">
 
 <nav class="brodsmula"><a href="../../">Valgprognose {valdag.year}</a>

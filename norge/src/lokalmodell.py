@@ -54,6 +54,28 @@ ROT = Path(__file__).resolve().parent.parent
 FORSTA_DIVISOR = 1.4
 LOKALT = ssb.LOKALT
 
+# Dämpning av rikstrenden. Lokalvalsstödet följer inte riksopinionen fullt ut:
+# väljarna röstar på lokala kandidater och lokala frågor, och ett parti som
+# fördubblas nationellt fördubblas inte i kommunerna.
+#
+# Mätt på lokalvalen 2019 till 2023 slår ungefär 0,65 av opinionsrörelsen
+# igenom lokalt, räknat som exponent på förändringskvoten. Backtestet
+# bekräftar att det är nära optimum:
+#
+#   dämpning   fylke   kommun
+#       0,00    3,18     3,87      (ingen skalning alls)
+#       0,50    1,79     3,31
+#       0,65    1,53     3,32
+#       0,80    1,44     3,41
+#       1,00    1,61     3,61      (full skalning)
+#
+# Utan dämpning blir enskilda partier orimliga. Fremskrittspartiet har gått
+# från 13,9 till 31,0 procent i riksopinionen sedan lokalvalet 2023, en kvot
+# på 2,23. Full skalning gav partiet 19,6 procent i snitt i kommunerna och 68
+# procent i den mest extrema, trots att FrP aldrig fått mer än 11,4 procent i
+# ett kommunval. Med dämpning blir kvoten 1,69 i stället för 2,23.
+TRENDDAMPNING = 0.65
+
 # Senaste lokalvalet. Nästa hålls 13 september 2027.
 FORRA_LOKALVALET = "2023"
 VALDAG_2027 = "2027-09-13"
@@ -81,7 +103,8 @@ OPINION_VID_LOKALVAL = {
 
 
 def rikstrend(riksprognos: dict[str, float],
-              referens: dict[str, float] | None = None) -> dict[str, float]:
+              referens: dict[str, float] | None = None,
+              dampning: float | None = None) -> dict[str, float]:
     """Förändringskvot per parti: dagens riksopinion delat med referensens.
 
     Referensen är riksopinionen vid det senaste lokalvalet, inte resultatet i
@@ -89,12 +112,15 @@ def rikstrend(riksprognos: dict[str, float],
     referens är den enskilt viktigaste metodfrågan i modellen och avgör om
     skalningen förbättrar eller försämrar prognosen.
 
-    Kvoten kapas i båda ändar. Ett parti som fyrdubblats nationellt har inte
-    fyrdubblats i varje kommun: lokalvalsstödet är trögare, och en okapad kvot
-    ger orimliga nivåer i kommuner där partiet redan var starkt.
+    Kvoten dämpas med TRENDDAMPNING och kapas därefter i båda ändar. Båda
+    behövs: dämpningen speglar att lokalvalsstödet är trögare än
+    riksopinionen, och kapningen hindrar extremvärden i kommuner där partiet
+    redan var starkt.
     """
     if referens is None:
         referens = OPINION_VID_LOKALVAL[FORRA_LOKALVALET]
+    if dampning is None:
+        dampning = TRENDDAMPNING
     ut = {}
     for parti in cfg.PARTIER:
         nu = riksprognos.get(parti)
@@ -102,7 +128,10 @@ def rikstrend(riksprognos: dict[str, float],
         if not nu or not da or da <= 0:
             ut[parti] = 1.0
             continue
-        ut[parti] = max(0.35, min(2.8, float(nu) / float(da)))
+        kvot = float(nu) / float(da)
+        # Dämpningen läggs som exponent, så att en fördubbling nationellt blir
+        # en mindre ökning lokalt medan riktningen bevaras. Se TRENDDAMPNING.
+        ut[parti] = max(0.35, min(2.8, kvot ** dampning))
     return ut
 
 
@@ -189,13 +218,14 @@ def skala_omrade(forra: dict[str, float], trend: dict[str, float],
 
 def prognos(riksprognos: dict[str, float], niva: str = "kommun",
             ar: str = FORRA_LOKALVALET,
-            referens: dict[str, float] | None = None) -> dict[str, dict]:
+            referens: dict[str, float] | None = None,
+            dampning: float | None = None) -> dict[str, dict]:
     """Bygger prognos per område för angiven nivå.
 
     `niva` är "kommun" eller "fylke". Returnerar en dict per område med
     andelar, mandat och församlingens storlek.
     """
-    trend = rikstrend(riksprognos, referens)
+    trend = rikstrend(riksprognos, referens, dampning)
 
     if niva == "fylke":
         roster = ssb.aggregera_till_fylke(ssb.hamta_fylkesval(ar))

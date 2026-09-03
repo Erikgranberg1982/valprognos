@@ -246,11 +246,37 @@ Backtest, 2019 skalat till 2023 med respektive referens:
 |---|---:|---:|
 | Ingen skalning, 2019 rakt av | 3,18 | 3,87 |
 | Närmaste stortingsval | 4,44 | 4,80 |
-| **Riksopinionen vid valdagen** | **1,61** | **3,61** |
+| Riksopinionen vid valdagen, full skalning | 1,61 | 3,61 |
+| **Riksopinionen med dämpning 0,65** | **1,53** | **3,32** |
 
 Procentenheters medelabsolutfel per parti. Fylkesnivån halveras, kommunnivån
 förbättras måttligt: där dominerar lokala listor och personer som rikstrenden
 inte fångar.
+
+#### Rikstrenden måste dämpas
+
+Lokalvalsstödet följer inte riksopinionen fullt ut. Mätt på lokalvalen 2019
+till 2023 slår ungefär **0,65** av opinionsrörelsen igenom lokalt, räknat som
+exponent på förändringskvoten. Backtestet bekräftar nivån:
+
+| Dämpning | Fylke | Kommun |
+|---|---:|---:|
+| 0,00 (ingen skalning) | 3,18 | 3,87 |
+| 0,50 | 1,79 | 3,31 |
+| **0,65** | **1,53** | **3,32** |
+| 0,80 | 1,44 | 3,41 |
+| 1,00 (full skalning) | 1,61 | 3,61 |
+
+Fylkesnivån är marginellt bättre vid 0,80 och kommunnivån vid 0,50, men 0,65
+ligger nära optimum för båda och sammanfaller med det observerade värdet.
+
+Utan dämpning blir enskilda partier orimliga. Fremskrittspartiet har gått
+från 13,9 till 31,0 procent i riksopinionen sedan lokalvalet 2023, en kvot på
+2,23. Full skalning gav partiet 19,6 procent i snitt över kommunerna och 68
+procent i den mest extrema, trots att FrP aldrig fått mer än 11,4 procent i
+ett kommunval. Med dämpning blir kvoten 1,68 och riksnivån 19,1 procent,
+vilket fortfarande är partiets bästa kommunval någonsin men följer av
+opinionsläget snarare än av ett modellfel.
 
 Referensvärdena ligger hårdkodade i `OPINION_VID_LOKALVAL` och kan räknas om
 med `python3 lokalmodell.py --referens 2023`.
