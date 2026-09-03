@@ -186,14 +186,38 @@ def kontrollera_seo(katalog: Path, riks_html: str) -> None:
     if antal_partisidor != vantat:
         FEL.append(f"{antal_partisidor} partisidor byggda, väntade {vantat}.")
 
+    # Lokalvalssidorna: 14 fylken och 357 kommuner plus en översikt. Antalen
+    # kan ändras vid en kommunreform, så avvikelse är en varning och inte ett
+    # fel. Att de saknas helt är däremot ett fel.
+    fylkessidor = len(list(katalog.glob("lokalvalg/fylke/*/index.html")))
+    kommunsidor = len(list(katalog.glob("lokalvalg/kommune/*/index.html")))
+    if not (katalog / "lokalvalg" / "index.html").exists():
+        FEL.append("lokalvalg/index.html saknas.")
+    if fylkessidor == 0 or kommunsidor == 0:
+        FEL.append(f"Lokalvalssidor saknas: {fylkessidor} fylken, "
+                   f"{kommunsidor} kommuner.")
+    else:
+        if fylkessidor != 14:
+            VARNING.append(f"{fylkessidor} fylkessidor, väntade 14.")
+        if kommunsidor != 357:
+            VARNING.append(f"{kommunsidor} kommunsidor, väntade 357.")
+        # Mandatsumman per område ska stämma, annars är fördelningen trasig.
+        prov = katalog / "lokalvalg" / "kommune" / "bergen" / "index.html"
+        if prov.exists() and "kommunestyret" not in prov.read_text(encoding="utf-8"):
+            FEL.append("Kommunsidan för Bergen ser inte ut som väntat.")
+        print(f"  lokalvalet: {fylkessidor} fylken, {kommunsidor} kommuner")
+
+    lokalsidor = fylkessidor + kommunsidor + (
+        1 if (katalog / "lokalvalg" / "index.html").exists() else 0)
     sitemapfil = katalog / "sitemap.xml"
     if not sitemapfil.exists():
         FEL.append("sitemap.xml saknas.")
     else:
         adresser = re.findall(r"<loc>(.*?)</loc>", sitemapfil.read_text(encoding="utf-8"))
-        if len(adresser) != vantat + 1:
+        forvantat = vantat + 1 + lokalsidor
+        if len(adresser) != forvantat:
             FEL.append(f"sitemap.xml har {len(adresser)} adresser, "
-                       f"väntade {vantat + 1}.")
+                       f"väntade {forvantat}.")
         for adress in adresser:
             if not adress.startswith(seo.BAS_URL):
                 FEL.append(f"sitemap.xml har en adress utanför webbplatsen: "

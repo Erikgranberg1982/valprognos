@@ -324,11 +324,26 @@ def main() -> None:
             res["sammanfattning"], trend, matningar, meta, katalog)
         print(f"  {len(partisidor)} partisidor")
 
+        # Lokalvalet 2027: fylkesting och kommunestyrer. Bygger på förra
+        # lokalvalets resultat skalat med riksopinionens förändring, med
+        # lokala listor konstanta. Osäkrare än stortingsprognosen, se
+        # lokalmodell.py.
+        lokala = None
+        try:
+            import lokalsida
+            lokala = lokalsida.skriv_alla(dict(res["snitt"]), katalog)
+            print(f"  lokalvalet 2027: {lokala['fylken']} fylken, "
+                  f"{lokala['kommuner']} kommuner")
+        except Exception as fel:
+            print(f"  Lokalvalssidorna kunde inte byggas: {fel}")
+
         # sitemap.xml och robots.txt. Bara kanoniska adresser tas med.
         idag = date.today().isoformat()
         sidor = [(seo.BAS_URL + "/", idag)]
         sidor += [(seo.partiurl(p), idag) for p in cfg.PARTIER
                   if p in res["sammanfattning"]["parti"].values]
+        if lokala:
+            sidor += [(a, idag) for a in lokala["adresser"]]
         (katalog / "sitemap.xml").write_text(seo.sitemap(sidor),
                                              encoding="utf-8")
         (katalog / "robots.txt").write_text(seo.robots(), encoding="utf-8")

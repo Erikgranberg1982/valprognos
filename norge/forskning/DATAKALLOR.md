@@ -186,34 +186,74 @@ per fylke görs i praktiken bara under lokalvalsår, och de mäter då
 *fylkestingsvalg*, inte stortingsvalg. Exempel: Rogaland hade två
 Respons-mätningar 2023, båda om fylkestinget.
 
-### Fylkestings- och kommunevalg 2027: kräver ny modell
+### Fylkestings- och kommunevalg 2027: byggt
 
 Valdagen är **13 september 2027**, alltså före stortingsvalet 2029.
+Implementerat i `src/lokalmodell.py` och `src/lokalsida.py`.
 
-Vad som är likt: mandat fördelas med St. Laguës modifierade metod och
-första delingstall 1,4, precis som i stortingsvalet.
+Datakällor, alla verifierade:
 
-Vad som skiljer, och varför modellen inte kan återanvändas rakt av:
+| Tabell | Innehåll |
+|---|---|
+| **01180** | Kommunestyrevalget, godkända röster per parti, 1945 till 2023 |
+| **01181** | Fylkestingsvalget, godkända röster per parti, 1975 till 2023 |
+| **04813** | Kommunestyremedlemmer, ger församlingens faktiska storlek |
+| Klass **131** | Kommunklassifikation, för kommun till fylke |
 
-- **Ingen fyraprocentsspärr.** Spärren är specifik för stortingsvalets
-  utjämningsmandat. Utan utjämningsmandat finns ingen spärr att räkna på,
-  och hela `mandat.py`-logiken faller bort. Kvar blir ren St. Laguë per
-  område.
-- **Inga utjämningsmandat alls.** Varje kommun och fylke fördelar sina
-  egna mandat, oberoende av riket.
-- **Lokala partier är avgörande.** I kommunvalet är restposten inte en
-  restpost: bygdelistor och lokala partier vinner mandat på egen hand.
-  Restposten `Andre` kan alltså inte hanteras som i stortingsmodellen.
-- **357 kommuner och 15 fylken** har var sin mandatstorlek som måste
-  hämtas, och kommunstyrets storlek beror på invånarantal.
-- **Underlaget saknas nästan helt.** Det finns inga löpande mätningar per
-  kommun. Prognosen skulle bygga på förra lokalvalets resultat plus
-  rikstrendens förändring, vilket är en betydligt svagare metod än den
-  som används för stortingsvalet.
+Fällor som visade sig:
 
-Datakällor som finns: SSB tabell **04813** (kommunestyremedlemmer per
-region och parti) och motsvarande för fylkesting. Valresultat bakåt finns
-alltså, det är prognosunderlaget som är tunt.
+- **01181 saknar fylkesrader.** Fylkestingsrösterna redovisas per kommun, så
+  summeringen till fylke måste göras själv. Kommunkodens två första siffror
+  är fylkeskoden.
+- **`Hele landet` ligger bland områdena.** Behandlas den som ett område får
+  man ett kommunestyre med 9 115 platser. Se `AGGREGAT` i ssb_lokalval.py.
+- **Områdesnamn bär giltighetssuffix.** 2019-data skriver "Alta (2020-2023)"
+  medan 2023-data skriver "Alta". Utan normalisering tappades 114 av 357
+  kommuner i backtestet. Fylkessuffix som "Våler (Innlandet)" måste däremot
+  behållas, det särskiljer två olika kommuner.
+- **Tvåspråkiga namn stämmer inte mellan tabeller.** Valtabellen skriver
+  "Kárásjohka - Karasjok", klassifikationen "Kárášjohka" med š. Alla
+  namnvarianter måste provas.
+- **04813 använder ContentsCode `Medlemmer`**, inte `Godkjente1`. Fel kod ger
+  HTTP 400.
+- **Oslo har inget fylkesting.** Kommunestyret fyller rollen, så Oslo finns
+  bara på kommunnivå. 14 fylkesting, inte 15.
+
+Mandatfördelningen är ren St. Laguë med första divisor 1,4, **utan spärr och
+utan utjämningsmandat**. Den effektiva tröskeln följer i stället av
+församlingens storlek. Summan stämmer: 9 115 mandat i 357 kommunestyrer och
+654 i 14 fylkesting.
+
+#### Referenspunkten är den viktigaste metodfrågan
+
+Metoden är att skala områdets 2023-resultat med riksopinionens förändring.
+Frågan är vad man skalar *från*, och svaret avgör om modellen fungerar alls.
+
+**Närmaste stortingsval som referens fungerar inte.** Mätt mot stortingsvalen
+2017 och 2021 gick fem av nio partier åt fel håll jämfört med lokalvalens
+faktiska förändring 2019 till 2023: Høyre föll 0,81 nationellt men steg 1,29 i
+kommunevalget, Senterpartiet steg 1,31 nationellt men kollapsade till 0,57
+lokalt. Skalningen blev då **sämre än att inte göra något**: 4,80 mot 3,87
+procentenheters fel.
+
+**Riksopinionen vid lokalvalsdagen fungerar.** Lokalvalen hålls två år efter
+stortingsvalen, och opinionen hinner röra sig långt. Mätt mot opinionen i
+september 2019 respektive 2023 pekar sju av nio partier rätt.
+
+Backtest, 2019 skalat till 2023 med respektive referens:
+
+| Referens | Fylke | Kommun |
+|---|---:|---:|
+| Ingen skalning, 2019 rakt av | 3,18 | 3,87 |
+| Närmaste stortingsval | 4,44 | 4,80 |
+| **Riksopinionen vid valdagen** | **1,61** | **3,61** |
+
+Procentenheters medelabsolutfel per parti. Fylkesnivån halveras, kommunnivån
+förbättras måttligt: där dominerar lokala listor och personer som rikstrenden
+inte fångar.
+
+Referensvärdena ligger hårdkodade i `OPINION_VID_LOKALVAL` och kan räknas om
+med `python3 lokalmodell.py --referens 2023`.
 
 ### Sametingsvalget
 
@@ -221,9 +261,7 @@ Hålls samtidigt som stortingsvalet, med sju valkretsar och egen
 valordning. Inga opinionsmätningar publiceras. Går inte att prognosticera
 på mätningar.
 
-### Rekommendation
+### Kvar att göra
 
-Distriktssidor för stortingsvalet är den enda utbyggnaden som är billig
-och välgrundad, eftersom siffrorna redan räknas. Fylkes- och kommunval
-2027 är ett eget projekt med egen modell och svagare underlag, och bör
-inte hängas på den här modellen.
+Distriktssidor för stortingsvalet, alltså en sida per valdistrikt. Siffrorna
+räknas redan i distriktsmodellen, så det är bara att publicera dem.

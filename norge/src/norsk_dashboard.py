@@ -567,6 +567,16 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
 {husfaktorstabell}
 
 <section>
+  <h2>Lokalvalget 2027</h2>
+  <p class="ledtext">Fylkestings- og kommunestyrevalget holdes 13. september
+    2027, altså før stortingsvalget. Prognosen bygger på resultatet i 2023
+    skalert med riksopinionen, med lokale lister holdt konstante, og er
+    dermed mer usikker enn prognosen over.</p>
+  <p class="ledtext"><a href="lokalvalg/">Se prognose for 14 fylker og 357
+    kommuner</a></p>
+</section>
+
+<section>
   <h2>Spørsmål og svar</h2>
   {fragehtml}
 </section>
