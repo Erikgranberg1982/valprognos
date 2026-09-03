@@ -154,11 +154,76 @@ behöver särskild uppmärksamhet, Finnmark särskilt.
 
 ## Vad som inte är utrett
 
-- **Distriktsprofiler.** Modellen behöver översätta rikstrend till 19
-  distriktsresultat. Underlaget finns i SSB 08092 över flera val, men metoden
-  är inte byggd.
+- ~~Distriktsprofiler.~~ **Byggt.** `src/distriktsmodell.py` skalar
+  rikstrenden till 19 distrikt med historiska profiler. Validerad ur
+  stickprov: sex mandats fel av 169.
 - **Mandat per distrikt för 2029.** Räknas om av departementet före valet, på
   befolkning och areal. Fram till dess får 2025 års fördelning användas.
-- **Fylkesvisa mätningar.** pollofpolls har `type=fylke&kommuneid=NN`. Kan ge
-  direkt underlag per distrikt, men täckningen är ojämn och outredd.
+- ~~Fylkesvisa mätningar.~~ **Utrett, och de finns i praktiken inte.**
+  `type=fylke` ger tomma tabeller för 2024 till 2026. Mätningar per fylke
+  görs bara under lokalvalsår och mäter då fylkestingsvalg, inte
+  stortingsvalg. Se avsnittet om andra valnivåer nedan.
 - **Kandidater och vallistor.** Ingen källa undersökt.
+
+## Andra valnivåer: vad som krävs
+
+Frågan är vad som behövs för att göra prognoser för fler nivåer än
+stortingsvalet. Svaret skiljer sig kraftigt mellan nivåerna.
+
+### Distriktsprognos för stortingsvalet: möjlig i dag
+
+Modellen räknar redan mandat i alla 19 valdistrikt, så siffrorna finns.
+Det som saknas är bara att publicera dem: en sida per valdistrikt med
+mandatfördelning och vilket parti som tar distriktets utjämningsmandat.
+
+**Osäkerheten är dock större än rikssiffrans.** Distriktsresultatet
+härleds ur rikstrenden via historisk profil, inte ur mätningar i
+distriktet. Det bör framgå tydligt om det publiceras.
+
+**Det finns nästan inga distriktsmätningar att förbättra med.**
+pollofpolls `type=fylke` ger tomma tabeller för 2024 till 2026. Mätningar
+per fylke görs i praktiken bara under lokalvalsår, och de mäter då
+*fylkestingsvalg*, inte stortingsvalg. Exempel: Rogaland hade två
+Respons-mätningar 2023, båda om fylkestinget.
+
+### Fylkestings- och kommunevalg 2027: kräver ny modell
+
+Valdagen är **13 september 2027**, alltså före stortingsvalet 2029.
+
+Vad som är likt: mandat fördelas med St. Laguës modifierade metod och
+första delingstall 1,4, precis som i stortingsvalet.
+
+Vad som skiljer, och varför modellen inte kan återanvändas rakt av:
+
+- **Ingen fyraprocentsspärr.** Spärren är specifik för stortingsvalets
+  utjämningsmandat. Utan utjämningsmandat finns ingen spärr att räkna på,
+  och hela `mandat.py`-logiken faller bort. Kvar blir ren St. Laguë per
+  område.
+- **Inga utjämningsmandat alls.** Varje kommun och fylke fördelar sina
+  egna mandat, oberoende av riket.
+- **Lokala partier är avgörande.** I kommunvalet är restposten inte en
+  restpost: bygdelistor och lokala partier vinner mandat på egen hand.
+  Restposten `Andre` kan alltså inte hanteras som i stortingsmodellen.
+- **357 kommuner och 15 fylken** har var sin mandatstorlek som måste
+  hämtas, och kommunstyrets storlek beror på invånarantal.
+- **Underlaget saknas nästan helt.** Det finns inga löpande mätningar per
+  kommun. Prognosen skulle bygga på förra lokalvalets resultat plus
+  rikstrendens förändring, vilket är en betydligt svagare metod än den
+  som används för stortingsvalet.
+
+Datakällor som finns: SSB tabell **04813** (kommunestyremedlemmer per
+region och parti) och motsvarande för fylkesting. Valresultat bakåt finns
+alltså, det är prognosunderlaget som är tunt.
+
+### Sametingsvalget
+
+Hålls samtidigt som stortingsvalet, med sju valkretsar och egen
+valordning. Inga opinionsmätningar publiceras. Går inte att prognosticera
+på mätningar.
+
+### Rekommendation
+
+Distriktssidor för stortingsvalet är den enda utbyggnaden som är billig
+och välgrundad, eftersom siffrorna redan räknas. Fylkes- och kommunval
+2027 är ett eget projekt med egen modell och svagare underlag, och bör
+inte hängas på den här modellen.

@@ -308,11 +308,31 @@ def main() -> None:
             "antal_simuleringar": res["sim"]["n"],
             "genererad": datetime.now().strftime("%Y-%m-%d %H:%M"),
         }
+        meta["genererad_iso"] = datetime.now().date().isoformat()
         html = norsk_dashboard.bygg(
             res["sammanfattning"], res["block"], res["regeringar"],
             trend, matningar, meta, res["husfaktorer"])
         ut = norsk_dashboard.spara(html)
-        print(f"Sidan sparad: {ut}\n")
+        katalog = ut.parent
+        print(f"Sidan sparad: {ut}")
+
+        # En sida per parti. Söken efter opinionsdata är partispecifik, så
+        # rikssidan ensam möter aldrig den vanligaste frågan.
+        import partisida_no
+        import seo
+        partisidor = partisida_no.skriv_alla(
+            res["sammanfattning"], trend, matningar, meta, katalog)
+        print(f"  {len(partisidor)} partisidor")
+
+        # sitemap.xml och robots.txt. Bara kanoniska adresser tas med.
+        idag = date.today().isoformat()
+        sidor = [(seo.BAS_URL + "/", idag)]
+        sidor += [(seo.partiurl(p), idag) for p in cfg.PARTIER
+                  if p in res["sammanfattning"]["parti"].values]
+        (katalog / "sitemap.xml").write_text(seo.sitemap(sidor),
+                                             encoding="utf-8")
+        (katalog / "robots.txt").write_text(seo.robots(), encoding="utf-8")
+        print(f"  sitemap.xml med {len(sidor)} adresser, robots.txt\n")
 
 
 if __name__ == "__main__":

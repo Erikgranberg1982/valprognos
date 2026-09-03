@@ -20,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 import config as cfg
+import seo
 
 ROT = Path(__file__).resolve().parent.parent
 
@@ -266,6 +267,86 @@ def _matningstabell(matningar: pd.DataFrame, antal: int = 15) -> str:
     return "\n".join(rader)
 
 
+# Sidans CSS, färdig och delad. Partisidorna importerar samma sträng så
+# att de två sidtyperna inte glider ifrån varandra. Färdigrenderad, inte
+# en mall: klamrarna är riktiga CSS-klamrar och färgerna är insatta.
+STIL = """  :root {
+    --korall: #EF7466; --korall-mork: #D95B4C; --morkbla: #003D63;
+    --sand: #FAF2E8; --ljusbla: #F1F3FA; --gron: #7DBA74;
+    --text: #14232e; --svag: #5d7080; --linje: #e3e8ee; --vit: #fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--sand); color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .omslag { max-width: 1080px; margin: 0 auto; padding: 0 20px 72px; }
+  header { padding: 34px 0 26px; }
+  header img { height: 34px; }
+  h1 { font-size: 2.1rem; line-height: 1.2; margin: 22px 0 6px; letter-spacing: -.02em; }
+  .underrubrik { color: var(--svag); font-size: 1.05rem; margin: 0; }
+  section { background: var(--vit); border-radius: 14px; padding: 26px 28px;
+             margin-bottom: 22px; border: 1px solid var(--linje); }
+  h2 { font-size: 1.22rem; margin: 0 0 6px; }
+  .ledtext { color: var(--svag); font-size: .93rem; margin: 0 0 18px; max-width: 74ch; }
+  .nyckeltal { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+                margin-bottom: 22px; }
+  .kort { background: var(--vit); border: 1px solid var(--linje); border-radius: 14px; padding: 18px 20px; }
+  .kort .etikett { color: var(--svag); font-size: .78rem; text-transform: uppercase;
+                    letter-spacing: .07em; margin-bottom: 7px; }
+  .partilista { text-transform: none; letter-spacing: 0; opacity: .75; }
+  .kort .varde { font-size: 1.85rem; font-weight: 650; line-height: 1.1; letter-spacing: -.02em; }
+  .kort .not { color: var(--svag); font-size: .84rem; margin-top: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+  th, td { padding: 9px 8px; border-bottom: 1px solid var(--linje); text-align: left; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
+        color: var(--svag); font-weight: 600; }
+  td.tal, th.tal { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:hover { background: var(--ljusbla); }
+  .tabellhölje { overflow-x: auto; }
+  .parti { white-space: nowrap; }
+  .prick { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            margin-right: 7px; vertical-align: middle; }
+  .partinamn { color: var(--svag); font-size: .85rem; }
+  .spann { color: var(--svag); font-variant-numeric: tabular-nums; }
+  .upp { color: #1a7f4f; font-weight: 600; }
+  .ned { color: var(--korall-mork); font-weight: 600; }
+  .stilla, .nodata { color: var(--svag); }
+  .gissat { color: var(--korall-mork); font-weight: 700; }
+  .graf, .kammare { width: 100%; height: auto; display: block; }
+  .rutnat { stroke: var(--linje); stroke-width: 1; }
+  .sparr { stroke: var(--korall); stroke-width: 1.4; stroke-dasharray: 5 4; }
+  .sparrtext { fill: var(--korall-mork); font-size: 11px; font-weight: 600; }
+  .axel { fill: var(--svag); font-size: 11px; }
+  .kurvnamn { font-size: 12px; font-weight: 700; }
+  .mittlinje { stroke: var(--morkbla); stroke-width: 1.4; stroke-dasharray: 4 4; }
+  .kammartext { fill: var(--svag); font-size: 12px; }
+  .beskrivning { color: var(--svag); font-size: .85rem; margin-top: 3px; max-width: 60ch; }
+  .sannolikhetscell { width: 210px; }
+  .sannolikhetsrad { display: flex; align-items: center; gap: 10px; }
+  .mini { flex: 1; height: 8px; background: var(--ljusbla); border-radius: 4px; overflow: hidden; }
+  .minifyll { height: 100%; background: var(--korall); border-radius: 4px; }
+  .sannolikhetstal { font-variant-numeric: tabular-nums; font-weight: 650;
+                      min-width: 62px; text-align: right; font-size: .9rem; }
+  .blockrad { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 720px) { .blockrad { grid-template-columns: 1fr; }
+    h1 { font-size: 1.6rem; } section { padding: 20px 18px; } }
+  footer { color: var(--svag); font-size: .86rem; padding: 8px 0 0; max-width: 78ch; }
+  footer a { color: var(--morkbla); }
+  .fraga { border-bottom: 1px solid var(--linje); padding: 12px 0; }
+  .fraga summary { cursor: pointer; font-weight: 620; }
+  .fraga p { color: var(--svag); margin: 9px 0 2px; max-width: 74ch; }
+  .partilank { display: inline-flex; align-items: center; gap: 6px;
+               border: 1px solid var(--linje); border-left-width: 3px;
+               border-radius: 8px; padding: 6px 12px; margin: 0 6px 8px 0;
+               text-decoration: none; color: var(--text); font-size: .9rem;
+               font-weight: 600; }
+  .partilank:hover { background: var(--ljusbla); }
+  code { background: var(--ljusbla); padding: 1px 5px; border-radius: 4px; font-size: .88em; }"""
+
+
 def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
          trend: pd.DataFrame, matningar: pd.DataFrame, meta: dict,
          husfaktorer: pd.DataFrame | None = None) -> str:
@@ -291,6 +372,21 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
                      "utfallet er uavgjort.")
 
     partikolumner = "".join(f'<th class="tal">{p}</th>' for p in ORDNING)
+
+    # Sökoptimerad titel och beskrivning, samt de frågor som besvaras synligt
+    # längre ner på sidan. Frågorna måste finnas i texten för att få ligga i
+    # den strukturerade datan.
+    sidtitel = seo.riks_titel(valdag, storsta["parti"], storsta["prognos"])
+    sidbeskrivning = seo.riks_beskrivning(sammanfattning, meta, block, valdag)
+    fragor = seo.riks_fragor(sammanfattning, block, meta, valdag)
+    fragehtml = "".join(
+        f'<details class="fraga"><summary>{html_mod.escape(f)}</summary>'
+        f'<p>{html_mod.escape(s)}</p></details>' for f, s in fragor)
+    partilankar = "".join(
+        f'<a class="partilank" href="parti/{seo.SLUG[p]}/" '
+        f'style="border-color:{cfg.PARTIFARG[p]}">'
+        f'<span class="prick" style="background:{cfg.PARTIFARG[p]}"></span>'
+        f'{seo.KORTNAMN.get(p, p)}</a>' for p in ORDNING)
 
     husfaktorstabell = ""
     if husfaktorer is not None and not husfaktorer.empty:
@@ -325,76 +421,13 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valgprognose {valdag.year} · Lysio Research</title>
-<meta name="description" content="Prognose for stortingsvalget {valdag.year}, bygget på {meta['antal_matningar']} meningsmålinger og {meta['antal_simuleringar']:,} simuleringer.">
+<title>{html_mod.escape(sidtitel)} · Lysio Research</title>
+{seo.metataggar(sidtitel, sidbeskrivning, seo.BAS_URL + "/")}
+{seo.strukturerad_data_riks(sammanfattning, meta, valdag)}
+{seo.strukturerad_data_fragor(fragor)}
 {cfg.google_analytics()}
 <style>
-  :root {{
-    --korall: {KORALL}; --korall-mork: {KORALL_MORK}; --morkbla: {MORKBLA};
-    --sand: {SAND}; --ljusbla: {LJUSBLA}; --gron: {GRON};
-    --text: #14232e; --svag: #5d7080; --linje: #e3e8ee; --vit: #fff;
-  }}
-  * {{ box-sizing: border-box; }}
-  body {{
-    margin: 0; background: var(--sand); color: var(--text);
-    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          "Helvetica Neue", Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }}
-  .omslag {{ max-width: 1080px; margin: 0 auto; padding: 0 20px 72px; }}
-  header {{ padding: 34px 0 26px; }}
-  header img {{ height: 34px; }}
-  h1 {{ font-size: 2.1rem; line-height: 1.2; margin: 22px 0 6px; letter-spacing: -.02em; }}
-  .underrubrik {{ color: var(--svag); font-size: 1.05rem; margin: 0; }}
-  section {{ background: var(--vit); border-radius: 14px; padding: 26px 28px;
-             margin-bottom: 22px; border: 1px solid var(--linje); }}
-  h2 {{ font-size: 1.22rem; margin: 0 0 6px; }}
-  .ledtext {{ color: var(--svag); font-size: .93rem; margin: 0 0 18px; max-width: 74ch; }}
-  .nyckeltal {{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-                margin-bottom: 22px; }}
-  .kort {{ background: var(--vit); border: 1px solid var(--linje); border-radius: 14px; padding: 18px 20px; }}
-  .kort .etikett {{ color: var(--svag); font-size: .78rem; text-transform: uppercase;
-                    letter-spacing: .07em; margin-bottom: 7px; }}
-  .partilista {{ text-transform: none; letter-spacing: 0; opacity: .75; }}
-  .kort .varde {{ font-size: 1.85rem; font-weight: 650; line-height: 1.1; letter-spacing: -.02em; }}
-  .kort .not {{ color: var(--svag); font-size: .84rem; margin-top: 5px; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: .93rem; }}
-  th, td {{ padding: 9px 8px; border-bottom: 1px solid var(--linje); text-align: left; }}
-  th {{ font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
-        color: var(--svag); font-weight: 600; }}
-  td.tal, th.tal {{ text-align: right; font-variant-numeric: tabular-nums; }}
-  tbody tr:hover {{ background: var(--ljusbla); }}
-  .tabellhölje {{ overflow-x: auto; }}
-  .parti {{ white-space: nowrap; }}
-  .prick {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-            margin-right: 7px; vertical-align: middle; }}
-  .partinamn {{ color: var(--svag); font-size: .85rem; }}
-  .spann {{ color: var(--svag); font-variant-numeric: tabular-nums; }}
-  .upp {{ color: #1a7f4f; font-weight: 600; }}
-  .ned {{ color: var(--korall-mork); font-weight: 600; }}
-  .stilla, .nodata {{ color: var(--svag); }}
-  .gissat {{ color: var(--korall-mork); font-weight: 700; }}
-  .graf, .kammare {{ width: 100%; height: auto; display: block; }}
-  .rutnat {{ stroke: var(--linje); stroke-width: 1; }}
-  .sparr {{ stroke: var(--korall); stroke-width: 1.4; stroke-dasharray: 5 4; }}
-  .sparrtext {{ fill: var(--korall-mork); font-size: 11px; font-weight: 600; }}
-  .axel {{ fill: var(--svag); font-size: 11px; }}
-  .kurvnamn {{ font-size: 12px; font-weight: 700; }}
-  .mittlinje {{ stroke: var(--morkbla); stroke-width: 1.4; stroke-dasharray: 4 4; }}
-  .kammartext {{ fill: var(--svag); font-size: 12px; }}
-  .beskrivning {{ color: var(--svag); font-size: .85rem; margin-top: 3px; max-width: 60ch; }}
-  .sannolikhetscell {{ width: 210px; }}
-  .sannolikhetsrad {{ display: flex; align-items: center; gap: 10px; }}
-  .mini {{ flex: 1; height: 8px; background: var(--ljusbla); border-radius: 4px; overflow: hidden; }}
-  .minifyll {{ height: 100%; background: var(--korall); border-radius: 4px; }}
-  .sannolikhetstal {{ font-variant-numeric: tabular-nums; font-weight: 650;
-                      min-width: 62px; text-align: right; font-size: .9rem; }}
-  .blockrad {{ display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }}
-  @media (max-width: 720px) {{ .blockrad {{ grid-template-columns: 1fr; }}
-    h1 {{ font-size: 1.6rem; }} section {{ padding: 20px 18px; }} }}
-  footer {{ color: var(--svag); font-size: .86rem; padding: 8px 0 0; max-width: 78ch; }}
-  footer a {{ color: var(--morkbla); }}
-  code {{ background: var(--ljusbla); padding: 1px 5px; border-radius: 4px; font-size: .88em; }}
+{STIL}
 </style>
 </head>
 <body>
@@ -449,6 +482,13 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
       </tbody>
     </table>
   </div>
+</section>
+
+<section>
+  <h2>Tall for hvert parti</h2>
+  <p class="ledtext">Egen side per parti med oppslutning over tid, siste
+    målinger og hva prognosen sier om sperregrensen.</p>
+  <div>{partilankar}</div>
 </section>
 
 <section>
@@ -525,6 +565,11 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
   </div>
 </section>
 {husfaktorstabell}
+
+<section>
+  <h2>Spørsmål og svar</h2>
+  {fragehtml}
+</section>
 
 <section>
   <h2>Slik beregnes prognosen</h2>

@@ -14,7 +14,10 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-ROT = Path(__file__).resolve().parent
+# Skriptet ligger i norge/ i publiceringsrepot men i scripts/ i
+# utvecklingsträdet. Roten är den katalog som har src/ i sig.
+_HAR = Path(__file__).resolve().parent
+ROT = _HAR if (_HAR / "src").is_dir() else _HAR.parent
 sys.path.insert(0, str(ROT / "src"))
 
 import config as cfg  # noqa: E402
@@ -98,7 +101,14 @@ def kontrollera_mandatfordelning() -> None:
 
 
 def kontrollera_sidan() -> None:
-    katalog = Path(os_environ_output() or (ROT.parent / "output" / "norge"))
+    # I publiceringsrepot skrivs sidan till repotets gemensamma output/norge/,
+    # alltså en nivå ovanför norge/. Lokalt ligger den i projektets egen
+    # output/norge/. NORSK_OUTPUT vinner alltid när den är satt.
+    if os_environ_output():
+        katalog = Path(os_environ_output())
+    else:
+        egen = ROT / "output" / "norge"
+        katalog = egen if egen.is_dir() else ROT.parent / "output" / "norge"
     fil = katalog / "index.html"
     if not fil.exists():
         FEL.append(f"{fil} saknas, sidan byggdes inte.")
@@ -123,6 +133,75 @@ def kontrollera_sidan() -> None:
             FEL.append(f"Sidan innehåller det svenska ordet {ord_!r}.")
 
     print(f"  Sidan är {len(html) / 1024:.0f} kB")
+    kontrollera_seo(katalog, html)
+
+
+def kontrollera_seo(katalog: Path, riks_html: str) -> None:
+    """Kontrollerar metadata, strukturerad data, partisidor och sitemap.
+
+    Titel- och beskrivningslängd kontrolleras eftersom Google klipper dem, och
+    en klippt titel tappar just de ord som står sist. JSON-LD kontrolleras för
+    att den ska gå att tolka: ett syntaxfel gör hela blocket värdelöst.
+    """
+    import json as _json
+    sys.path.insert(0, str(ROT / "src"))
+    import seo
+
+    for tagg, namn in (('rel="canonical"', "canonical"),
+                       ('property="og:title"', "og:title"),
+                       ('name="description"', "description")):
+        if tagg not in riks_html:
+            FEL.append(f"Rikssidan saknar {namn}.")
+
+    titel = re.search(r"<title>(.*?)</title>", riks_html, re.S)
+    if titel and len(titel.group(1)) > 60:
+        VARNING.append(f"Titeln är {len(titel.group(1))} tecken och klipps "
+                       f"troligen i sökresultatet: {titel.group(1)!r}")
+    beskrivning = re.search(r'name="description" content="(.*?)"', riks_html, re.S)
+    if beskrivning:
+        n = len(beskrivning.group(1))
+        if not 100 <= n <= 158:
+            VARNING.append(f"Beskrivningen är {n} tecken, målet är 140 till 158.")
+
+    # Strukturerad data ska gå att tolka på varje sida som har den.
+    antal_partisidor = 0
+    for fil in sorted(katalog.glob("parti/*/index.html")):
+        antal_partisidor += 1
+        sidhtml = fil.read_text(encoding="utf-8")
+        for block in re.findall(
+                r'<script type="application/ld\+json">(.*?)</script>',
+                sidhtml, re.S):
+            try:
+                _json.loads(block)
+            except ValueError as fel:
+                FEL.append(f"Trasig JSON-LD i {fil.parent.name}: {fel}")
+        t = re.search(r"<title>(.*?)</title>", sidhtml, re.S)
+        if t and len(t.group(1)) > 60:
+            VARNING.append(f"Titeln på {fil.parent.name} är "
+                           f"{len(t.group(1))} tecken.")
+        if "sperregrense" not in sidhtml.lower():
+            VARNING.append(f"{fil.parent.name} nämner inte sperregrensen.")
+
+    vantat = len(cfg.PARTIER)
+    if antal_partisidor != vantat:
+        FEL.append(f"{antal_partisidor} partisidor byggda, väntade {vantat}.")
+
+    sitemapfil = katalog / "sitemap.xml"
+    if not sitemapfil.exists():
+        FEL.append("sitemap.xml saknas.")
+    else:
+        adresser = re.findall(r"<loc>(.*?)</loc>", sitemapfil.read_text(encoding="utf-8"))
+        if len(adresser) != vantat + 1:
+            FEL.append(f"sitemap.xml har {len(adresser)} adresser, "
+                       f"väntade {vantat + 1}.")
+        for adress in adresser:
+            if not adress.startswith(seo.BAS_URL):
+                FEL.append(f"sitemap.xml har en adress utanför webbplatsen: "
+                           f"{adress}")
+    if not (katalog / "robots.txt").exists():
+        FEL.append("robots.txt saknas.")
+
+    print(f"  {antal_partisidor} partisidor, sitemap och robots.txt")
 
 
 def os_environ_output() -> str | None:
