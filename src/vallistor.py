@@ -16,6 +16,7 @@ import pandas as pd
 import requests
 
 import config as cfg
+import modell
 
 ROT = Path(__file__).resolve().parent.parent
 CACHE = ROT / "data" / "valmyndigheten"
@@ -1066,10 +1067,19 @@ def _riksdagsmandat_per_valkrets(sammanfattning: pd.DataFrame,
         for parti in cfg.PARTIER
         if parti in sm.index
     }
-    diff = cfg.MANDAT_TOTALT - sum(partimandat.values())
-    if diff and partimandat:
-        storst = max(partimandat, key=partimandat.get)
-        partimandat[storst] = max(0, partimandat[storst] + diff)
+    # Medianen per parti summerar sällan till 349, eftersom varje partis
+    # median tas oberoende av de andra. Skillnaden är normalt ett par mandat.
+    #
+    # Att lägga hela differensen på största partiet gav S 110 namn mot
+    # prognosens 108. Fördela i stället om med samma metod som prognosen
+    # använder, vilket per konstruktion ger exakt 349.
+    if sum(partimandat.values()) != cfg.MANDAT_TOTALT and partimandat:
+        prognoskolumn = "stod_medel" if "stod_medel" in sm.columns else "prognos"
+        roster = {p: float(sm.at[p, prognoskolumn]) for p in partimandat
+                  if p in sm.index}
+        if roster:
+            omfordelat = modell.fordela_mandat(roster)
+            partimandat = {p: omfordelat.get(p, 0) for p in partimandat}
 
     valkretsar = _rd_valkretsar(index, omrade)
     rader = []
