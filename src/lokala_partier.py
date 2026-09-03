@@ -83,6 +83,7 @@ def las_matningar() -> pd.DataFrame:
                 "datum": (rad.get("datum") or "").strip(),
                 "lokalt_parti": (rad.get("lokalt_parti") or "").strip() or None,
                 "lokalt_stod": tal("lokalt_stod"),
+                "ovriga_stod": tal("ovriga_stod"),
                 "kalla": (rad.get("kalla") or "").strip(),
                 "kommentar": (rad.get("kommentar") or "").strip(),
             }
@@ -152,6 +153,9 @@ def beskriv_matning(rad) -> dict:
         "lokalt_parti": rad["lokalt_parti"],
         "lokalt_stod": (float(rad["lokalt_stod"])
                         if np.isfinite(rad["lokalt_stod"]) else None),
+        "ovriga_stod": (float(rad["ovriga_stod"])
+                        if "ovriga_stod" in rad
+                        and np.isfinite(rad["ovriga_stod"]) else None),
         "kalla": rad["kalla"],
         "kommentar": rad["kommentar"],
     }
@@ -228,6 +232,13 @@ def blanda_in_matning(stod: dict[str, float], niva: str,
         vagt = (1.0 - vikt) * bas + vikt * matning["lokalt_stod"]
         ut[lokalt] = vagt
         ut["ÖVRIGA"] = max(0.0, bas - vagt)
+    elif matning.get("ovriga_stod") is not None:
+        # Mätningen redovisar övriga utan att namnge något parti. Utan detta
+        # står modellens egen skattning kvar, och normaliseringen tvingar
+        # avvikelsen in i riksdagspartierna: Malmö mätte 2,3 procent övriga
+        # mot modellens 6,4.
+        ut["ÖVRIGA"] = ((1.0 - vikt) * ut.get("ÖVRIGA", 0.0)
+                        + vikt * matning["ovriga_stod"])
 
     # Normalisera till hundra procent.
     summa = sum(v for v in ut.values() if v > 0)
