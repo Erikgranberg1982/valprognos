@@ -279,8 +279,9 @@ def main() -> None:
     fil = ROT / "data" / "matningar.csv"
     if args.hamta or not fil.exists():
         print("Hämtar mätningar från Wikipedia...")
-        df_ny = scraper.skrapa(2026)
-        scraper.spara(df_ny, 2026)
+        # skrapa tar sidans titel, inte ett årtal som den svenska versionen.
+        df_ny = scraper.skrapa()
+        scraper.spara(df_ny, fil)
         print(f"  {len(df_ny)} mätningar sparade.\n")
 
     df = las_matningar(fil)
