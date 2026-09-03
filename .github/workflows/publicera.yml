@@ -1,4 +1,4 @@
-name: Bygg och publicera valprognos
+name: Bygg och publicera valprognos (Sverige och Norge)
 
 on:
   schedule:
@@ -47,6 +47,32 @@ jobs:
         with:
           name: matningar
           path: data/matningar.csv
+          retention-days: 30
+
+      # Den norska prognosen ligger i norge/ och byggs in som undersida.
+      # Den delar Pages-artefakt med den svenska: GitHub Pages deployar en
+      # artefakt per körning, så två separata arbetsflöden skulle skriva över
+      # varandra. Därför byggs båda här.
+      - name: Installera beroenden för norska prognosen
+        run: pip install -r norge/requirements.txt
+
+      - name: Bygg den norska prognosen
+        env:
+          NORSK_OUTPUT: ${{ github.workspace }}/output/norge
+        run: |
+          cd norge/src
+          python3 prognos.py --hamta
+
+      - name: Kontrollera det norska bygget
+        env:
+          NORSK_OUTPUT: ${{ github.workspace }}/output/norge
+        run: python3 norge/kontrollera.py
+
+      - name: Spara de norska mätningarna som artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: matningar-norge
+          path: norge/data/matningar.csv
           retention-days: 30
 
       - uses: actions/upload-pages-artifact@v3

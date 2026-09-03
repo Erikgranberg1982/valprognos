@@ -1,0 +1,14 @@
+parameter,varde,kommentar
+halveringstid_dagar,21,Antal dagar innan en mätnings tidsvikt halveras. Backtest mot 2018 och 2022 visar att kortare halveringstid ger sämre träffsäkerhet på alla avstånd till valdagen: 7 dagar ger effektivt 5,6 mätningar i snittet mot 10,1 vid 21 dagar, och bruset från enskilda institut väger då tyngre än den färskare informationen. Längre än 21 mätte marginellt bättre men gör prognosen trögare mot en verklig sen rörelse, vilket 2018 visar att det finns.
+max_alder_dagar,365,Mätningar äldre än så här exkluderas helt.
+husfaktor_fonster_dagar,540,Tidsfönster bakåt för att skatta husfaktorer per institut.
+husfaktor_dampning,0.75,Andel av skattad husfaktor som faktiskt korrigeras bort. 1.0 = full korrigering.
+min_matningar_husfaktor,4,Minsta antal mätningar innan husfaktor skattas för ett institut.
+nationellt_fel_sd,0.006,Korrelerat blockfel per parti. Kalibrerat mot de fyra stortingsvalen 2013 till 2025: modellens totala spridning per parti passar då det observerade RMSE över hela tidsspannet.
+partifel_sd,0.006,Partispecifikt oberoende fel. Kalibrerat mot samma fyra val. Skalas med partiets storlek i simuleringen så att stora partier får större absolut fel.
+trend_drift_sd_per_manad,0.0120,Extra osäkerhet per kvadratrot-effektiv-månad kvar till valdagen. Kalibrerat mot fyra val. Se drift_mattnad_manader: driften mättas i stället för att växa fritt.
+antal_simuleringar,40000,Antal Monte Carlo-dragningar.
+anvand_valdagskorrigering,0,Sätt till 1 för att aktivera den historiska valdagskorrigeringen i data/valdagskorrigering.csv. Avstängd som standard eftersom den bygger på ett enda val och riskerar att befästa 2022-cykelns särdrag.
+lokal_matning_halveringstid,120,Halveringstid i dagar för lokala mätningars vikt. Betydligt längre än riksmätningarnas eftersom en lokal mätning mäter just det område den gäller medan alternativet bara är en extrapolering från rikstrenden. En tre månader gammal lokal mätning är fortfarande bättre underlag än ingen alls.
+lokal_matning_maxvikt,0.9,Högsta vikt en lokal mätning kan få mot modellens egen skattning. Under 1.0 eftersom även en färsk mätning har urvalsosäkerhet och modellens skattning bär information om rikstrenden sedan mätningen gjordes.
+drift_mattnad_manader,18,Mättnadspunkt i månader för driftosäkerheten. Backtestet mot 2013 till 2025 visar att prognosfelet planar ut kring 4,5 procentenheter efter ungefär två år i stället för att växa som roten ur tiden. Partistödet är medelåtervändande. Utan mättnad blir driften 7,8 procentenheter på tre års avstånd mot observerade 4,5.

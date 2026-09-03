@@ -1,0 +1,9 @@
+institut,vikt,typiskt_urval,metod,kommentar
+Norstat,1.20,1000,telefon och webbpanel,Mäter för flera uppdragsgivare däribland Vårt Land och Nationen. Etablerat institut med lång serie. Vikt och urval är preliminära och behöver kalibreras mot norsk historik.
+Respons Analyse,1.15,1000,webbpanel,Mäter för Aftenposten och Bergens Tidende. Vikt preliminär.
+Opinion,1.15,1000,webbpanel,Mäter for Dagsavisen och FriFagbevegelse. Publicerar Norsk Monitor. Vikt preliminär.
+Verian,1.20,1000,slumpmässigt urval,Tidigare Kantar TNS. Mäter för TV2. Vikt preliminär.
+Ipsos,1.10,1000,webbpanel med visst slumpurval,Mäter för Dagbladet. Vikt preliminär.
+InFact,1.00,1000,automatiserad telefon,Mäter för Nettavisen och lokalpress. Vikt preliminär.
+Norfakta,1.00,1000,telefon,Mäter för Klassekampen och Nationen. Vikt preliminär.
+Sentio,0.90,1000,telefon och webb,Mäter för Amedia och Nettavisen. Vikt preliminär.

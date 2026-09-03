@@ -1567,7 +1567,11 @@ partiet högre än konsensus. Modellen korrigerar bort
   på 0,73 procentenheter och gav vänsterblocket 174 mandat mot faktiska 173.
   Kalibreringen vilar på en enda valcykel och bör tolkas med det i åtanke.<br>
   <strong>Källa.</strong> Opinionsmätningar sammanställda på svenska Wikipedia.
-  Genererad {meta['genererad']}.
+  Genererad {meta['genererad']}.<br>
+  <strong>Norge.</strong> Motsvarande prognos för stortingsvalet 2029 finns på
+  <a href="norge/">valprognos/norge</a>. Den norska modellen fördelar mandat i
+  alla 19 valdistrikt, eftersom fyraprocentsspärren där bara gäller
+  utjämningsmandaten.
 </footer>
 
 </div>
