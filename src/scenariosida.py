@@ -25,6 +25,15 @@ def _mandatstapel(mandat: dict, farger: dict) -> str:
     return "".join(bitar)
 
 
+def _seo_taggar(meta: dict, antal: int) -> str:
+    import seo
+    titel = "Scenarier för riksdagsvalet 2026"
+    besk = (f"{antal} tänkta utfall för riksdagen: om Liberalerna klarar "
+            "spärren, om sommartrenden håller, om valspurten upprepar sig och "
+            "om ett lokalt parti tar en valkrets. Mandat och regeringsunderlag.")
+    return seo.metataggar(titel, besk, "scenarier_2026.html")
+
+
 def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
     utfall = scenarier.kor_alla(baslinje, matningar, meta.get("dagar_kvar"))
 
@@ -50,6 +59,7 @@ def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
         dagar=meta.get("dagar_kvar", ""),
         matningar=meta.get("antal_matningar", 0),
         antal=len(utfall),
+        seo_taggar=_seo_taggar(meta, len(utfall)),
     )
     katalog.mkdir(parents=True, exist_ok=True)
     ut = katalog / "scenarier_2026.html"
@@ -423,6 +433,7 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
 _MALL = """<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scenarier för riksdagsvalet 2026</title>
+{seo_taggar}
 {ga}
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>

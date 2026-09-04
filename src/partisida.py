@@ -152,6 +152,15 @@ def _bygg_partidata(sammanfattning: pd.DataFrame, trend: pd.DataFrame,
     return ut
 
 
+def _seo_taggar(dagar, matningar) -> str:
+    import seo
+    titel = "Partierna i riksdagsvalet 2026"
+    besk = (f"Parti för parti inför valet 13 september 2026, {dagar} dagar "
+            "kvar. Trend, mandat, i vilka valkretsar de hamnar och vilka "
+            f"kandidater som tar platserna. Bygger på {matningar} mätningar.")
+    return seo.metataggar(titel, besk, "partier_2026.html")
+
+
 def skriv(katalog: Path, sammanfattning: pd.DataFrame,
           trend: pd.DataFrame, meta: dict) -> Path | None:
     kandidater = _kandidater()
@@ -170,6 +179,8 @@ def skriv(katalog: Path, sammanfattning: pd.DataFrame,
 
     html = _MALL.format(
         ga=cfg.google_analytics(),
+        seo_taggar=_seo_taggar(meta.get('dagar_kvar', 0),
+                               meta.get('antal_matningar', 0)),
         flikar=flikar,
         data=json.dumps(data, ensure_ascii=False, separators=(",", ":")),
         datum=json.dumps(datum),
@@ -187,6 +198,7 @@ def skriv(katalog: Path, sammanfattning: pd.DataFrame,
 _MALL = """<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Partierna i riksdagsvalet 2026</title>
+{seo_taggar}
 {ga}
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>

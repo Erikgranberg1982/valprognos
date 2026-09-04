@@ -823,10 +823,18 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
     sim_text = f"{meta['antal_simuleringar']:,}".replace(",", "\u00a0")
     ga = cfg.google_analytics()
 
+    import seo
+    _titel = f"Valprognos {cfg.VALDAG[:4]} · riksdag, region och kommun"
+    _besk = seo.riks_beskrivning(sammanfattning, meta, block)
+    seo_taggar = seo.metataggar(_titel, _besk, "index.html")
+    seo_data = seo.strukturerad_data(_titel, _besk, "index.html", meta)
+
     return f"""<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Valprognos 2026</title>
+{seo_taggar}
+{seo_data}
 
 {ga}
 <link rel="preconnect" href="https://fonts.googleapis.com">

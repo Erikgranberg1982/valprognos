@@ -432,6 +432,16 @@ def main() -> None:
             scenariosida.skriv(ROT / "output", res["snitt"], meta, df)
         except Exception as fel:
             print(f"  Scenariosidan kunde inte byggas: {fel}")
+        try:
+            import seo
+            sidor = ["index.html", "partier_2026.html",
+                     "ledamoter_2026.html", "scenarier_2026.html"]
+            (ROT / "output" / "sitemap.xml").write_text(
+                seo.sitemap(sidor, meta.get("genererad")), encoding="utf-8")
+            (ROT / "output" / "robots.txt").write_text(
+                seo.robots(), encoding="utf-8")
+        except Exception as fel:
+            print(f"  Sitemap kunde inte skrivas: {fel}")
         print(f"Dashboard sparad: {ut}\n")
 
 

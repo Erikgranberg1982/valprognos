@@ -36,6 +36,15 @@ def _las() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _seo_taggar(antal: int) -> str:
+    import seo
+    titel = f"Riksdagen 2026: alla {antal} prognosticerade ledamöter"
+    besk = (f"Sökbar lista över de {antal} personer som enligt prognosen tar "
+            "plats i riksdagen efter valet 2026, med parti, valkrets, ålder "
+            "och plats på valsedeln.")
+    return seo.metataggar(titel, besk, "ledamoter_2026.html")
+
+
 def skriv(katalog: Path) -> Path | None:
     """Skriver sidan och en CSV med samma innehåll."""
     df = _las()
@@ -77,7 +86,9 @@ def skriv(katalog: Path) -> Path | None:
     knappar = "".join(f'<button data-f="{p}">{p}</button>' for p in ordning)
 
     html = _MALL.format(antal=len(df),
-        ga=cfg.google_analytics(),valkretsar=df["valkretsnamn"].nunique(),
+        ga=cfg.google_analytics(),
+        seo_taggar=_seo_taggar(len(df)),
+        valkretsar=df["valkretsnamn"].nunique(),
                         farg=farg, knappar=knappar, rader="".join(rader))
 
     katalog.mkdir(parents=True, exist_ok=True)
@@ -97,6 +108,7 @@ def skriv(katalog: Path) -> Path | None:
 _MALL = '''<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riksdagen 2026 – prognosticerade ledamöter</title>
+{seo_taggar}
 {ga}
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
