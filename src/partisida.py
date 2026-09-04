@@ -38,7 +38,93 @@ def _kandidater() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
+def _geografi() -> dict | None:
+    """Underlaget för att fördela mandat på valkretsar.
+
+    Rösttalen 2022 per valkrets och de fasta valkretsmandaten 2026. Utan dem
+    kan tabellen ändå visa mandatförändringen per parti, bara inte var.
+    """
+    try:
+        import scb_data
+        import vallistor
+        roster = scb_data.hamta_riksdagsval_per_valkrets_roster(["2022"])
+        if roster.empty:
+            return None
+        index = vallistor.VallisteIndex(vallistor.las_kandidaturer(),
+                                        vallistor.las_deltagande_partier())
+        namn = {str(v["valkretskod"]).zfill(2): v["valkretsnamn"]
+                for _, v in vallistor._rd_valkretsar(index).iterrows()}
+        return {
+            "roster": roster.xs("2022", level="ar"),
+            "namn": namn,
+            "fasta": vallistor._fasta_valkretsmandat(),
+            "fordela": vallistor._fordela_riksdagsmandat,
+        }
+    except Exception:
+        return None
+
+
+def _fordela_geografiskt(stod: dict, geo: dict) -> dict:
+    """Fördelar mandaten på valkretsar för ett givet stödläge.
+
+    Samma tvåstegsmetod som huvudprognosen: fasta valkretsmandat först, sedan
+    utjämning efter jämförelsetal.
+    """
+    vikter = {}
+    for parti in cfg.PARTIER:
+        trend = stod[parti] / cfg.VALRESULTAT_2022.get(parti, 1.0)
+        vikter[parti] = {kod: float(geo["roster"][parti].get(kod, 0.0)) * trend
+                         for kod in geo["namn"]}
+    mandat = modell.fordela_mandat(stod)
+    return geo["fordela"](vikter, {p: mandat[p] for p in cfg.PARTIER},
+                          geo["fasta"], geo["namn"])
+
+
+def _listordning(kandidater: pd.DataFrame) -> dict:
+    """Kandidaterna per parti och valkrets, i listordning.
+
+    Används för att sätta namn på de mandat som tillkommer eller faller bort
+    när stödet ändras. Listan hämtas ur vallistorna och inte ur prognosen,
+    eftersom ett parti kan vinna mandat i en valkrets där det inte har något
+    i dag: Kristdemokraterna saknar mandat i Norrbotten men har en lista där.
+    """
+    try:
+        import vallistor
+        index = vallistor.VallisteIndex(vallistor.las_kandidaturer(),
+                                        vallistor.las_deltagande_partier())
+        valkretsar = vallistor._rd_valkretsar(index)
+    except Exception:
+        return {}
+
+    ut: dict[tuple[str, str], list[str]] = {}
+    for parti in cfg.PARTIER:
+        try:
+            alla = vallistor._listor_for(index, "RD", parti, "00")
+        except Exception:
+            continue
+        for _, vk in valkretsar.iterrows():
+            vknamn = str(vk["valkretsnamn"])
+            try:
+                listor = vallistor._rd_listor_i_valkrets(alla, vknamn)
+                if listor.empty:
+                    continue
+                vald, _m, _v, skal = vallistor._valj_lista(listor)
+                if skal is not None or vald.empty:
+                    continue
+                rad = vald.iloc[0]
+                kand = index.kandidater_for_lista(
+                    "RD", "00", rad["partinyckel"], str(rad["listnummer"]))
+                if kand.empty:
+                    continue
+                kand = kand.sort_values(["ordning", "kandidatnummer"])
+                ut[(parti, vknamn)] = kand["namn"].tolist()
+            except Exception:
+                continue
+    return ut
+
+
+def _kanslighet(sammanfattning: pd.DataFrame,
+                kandidater: pd.DataFrame | None = None) -> dict:
     """Vad händer med mandaten om ett parti vinner eller tappar väljare?
 
     För varje parti och varje förskjutning mellan minus tre och plus tre
@@ -54,6 +140,20 @@ def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
     bas = {p: float(sammanfattning.set_index("parti").at[p, "prognos"])
            for p in cfg.PARTIER}
     utgangslage = modell.fordela_mandat(bas)
+
+    # Valkretsfördelningen kräver SCB:s rösttal och Valmyndighetens fasta
+    # mandat. Saknas något faller tabellen tillbaka på enbart partinivå.
+    geo = _geografi()
+    utgang_geo = _fordela_geografiskt(bas, geo) if geo else {}
+    listor = _listordning(kandidater) if kandidater is not None else {}
+
+    # Vem som redan tagit en plats i prognosen, och var. En partiledare står
+    # etta på trettio listor men kan bara ta ett mandat: utan detta skulle
+    # Ebba Busch dyka upp som vinnare i tre valkretsar samtidigt.
+    upptagna: dict[str, str] = {}
+    if kandidater is not None and not kandidater.empty:
+        for _, rad in kandidater.iterrows():
+            upptagna[str(rad["namn"])] = str(rad["valkretsnamn"])
 
     ut = {}
     for parti in cfg.PARTIER:
@@ -73,6 +173,30 @@ def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
             mandat = modell.fordela_mandat(nytt)
             forandring = {p: mandat[p] - utgangslage[p] for p in cfg.PARTIER
                           if mandat[p] != utgangslage[p] and p != parti}
+
+            # Vilka valkretsar partiet vinner eller tappar.
+            vinner, tappar = [], []
+            if geo:
+                nytt_geo = _fordela_geografiskt(nytt, geo)
+                for kod, vknamn in geo["namn"].items():
+                    a = utgang_geo.get((parti, kod), 0)
+                    b = nytt_geo.get((parti, kod), 0)
+                    if b == a:
+                        continue
+                    # Kandidater som redan tagit plats i en annan valkrets
+                    # står kvar på listan men är inte valbara här.
+                    namn = [n for n in listor.get((parti, vknamn), [])
+                            if upptagna.get(n, vknamn) == vknamn]
+                    if b > a:
+                        # De som tillkommer står på plats a och framåt.
+                        vinner.append({"vk": vknamn, "n": b - a,
+                                       "namn": namn[a:b]})
+                    else:
+                        # De som faller bort är de sist invalda.
+                        tappar.append({"vk": vknamn, "n": a - b,
+                                       "namn": namn[b:a]})
+                vinner.sort(key=lambda x: (-x["n"], x["vk"]))
+                tappar.sort(key=lambda x: (-x["n"], x["vk"]))
             rader.append({
                 "d": delta,
                 "stod": round(nytt[parti], 1),
@@ -82,6 +206,8 @@ def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
                 "andra": sorted(
                     ({"p": p, "d": v} for p, v in forandring.items()),
                     key=lambda x: (-abs(x["d"]), x["p"])),
+                "vinner": vinner,
+                "tappar": tappar,
             })
         ut[parti] = rader
     return ut
@@ -90,7 +216,7 @@ def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
 def _bygg_partidata(sammanfattning: pd.DataFrame, trend: pd.DataFrame,
                     kandidater: pd.DataFrame) -> dict:
     """Samlar allt per parti i en struktur som sidan kan rendera."""
-    kanslighet = _kanslighet(sammanfattning)
+    kanslighet = _kanslighet(sammanfattning, kandidater)
     ut = {}
     for _, rad in sammanfattning.iterrows():
         parti = rad["parti"]
@@ -262,6 +388,16 @@ vertical-align:middle}}
 .kp{{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}}
 .ksep{{color:var(--linje);margin:0 7px}}
 .kingen{{color:var(--svag);font-style:italic}}
+.kvkr{{font-size:12px;line-height:1.9;max-width:280px}}
+.kvk{{display:inline-block;padding:2px 8px;border-radius:20px;margin:0 4px 3px 0;
+white-space:nowrap}}
+.kvk.vin{{background:rgba(125,186,116,.18);color:#3f7a36}}
+.kvk.tap{{background:var(--korall-ljus);color:var(--korall-mork)}}
+.kvk{{display:inline-flex;flex-direction:column;line-height:1.35;
+padding:4px 9px;margin:0 4px 4px 0;border-radius:9px;white-space:normal}}
+.kvkn{{font-size:10px;opacity:.75;font-weight:600}}
+.kvkfler{{display:inline-block;font-size:11.5px;color:var(--svag);
+font-style:italic;padding:4px 2px}}
 .fot{{margin:14px 0 0;font-size:12px;color:var(--svag);line-height:1.6}}
 .vkrad{{display:grid;grid-template-columns:230px 1fr;gap:16px;padding:14px 0;
 border-top:1px solid var(--linje)}}
@@ -372,12 +508,31 @@ function rita(p){{
              (a.d>0?'+':'')+a.d+'</span>';
     }}).join('<span class="ksep">·</span>') || '<span class="kingen">ingen ändring</span>';
     var kl=r.diff>0?'upp':(r.diff<0?'ned':'noll');
+    function vkm(x, kl){{
+      var n=(x.namn||[]).join(', ');
+      return '<span class="kvk '+kl+'" title="'+x.vk+
+             (n?': '+n.replace(/"/g,'&quot;'):'')+'">'+
+             (n||x.vk)+(x.n>1?' +'+x.n:'')+
+             '<span class="kvkn">'+x.vk+'</span></span>';
+    }}
+    /* Vid stora förskjutningar blir listan lång. Visa de sex första och
+       räkna resten, annars sväller raden till en halv skärm. */
+    var alla=(r.vinner||[]).map(function(x){{return {{x:x,k:'vin'}}}})
+      .concat((r.tappar||[]).map(function(x){{return {{x:x,k:'tap'}}}}));
+    var vk=alla.slice(0,6).map(function(o){{return vkm(o.x,o.k)}}).join('');
+    if(alla.length>6){{
+      var kvar=0;
+      for(var q=6;q<alla.length;q++) kvar+=alla[q].x.n;
+      vk+='<span class="kvkfler">och '+kvar+' till i '+
+          (alla.length-6)+' valkretsar</span>';
+    }}
     return '<tr'+(r.over?'':' class="usparr"')+'>'+
       '<td class="kandr">'+(r.d>0?'+':'')+r.d.toFixed(0)+' pe</td>'+
       '<td class="ta">'+r.stod.toFixed(1)+' %'+(r.over?'':'<span class="ku">under spärren</span>')+'</td>'+
       '<td class="ta"><strong>'+r.mandat+'</strong>'+
       (r.diff?' <span class="kd '+kl+'">'+(r.diff>0?'+':'')+r.diff+'</span>':'')+'</td>'+
-      '<td class="kandra">'+andra+'</td></tr>';
+      '<td class="kandra">'+andra+'</td>'+
+      '<td class="kvkr">'+(vk||'<span class="kingen">—</span>')+'</td></tr>';
   }}).join('');
   var vk=d.valkretsar.map(function(v){{
     var namn=v.kandidater.map(function(k){{
@@ -407,6 +562,9 @@ function rita(p){{
     '</div>'+
     '<canvas id="tg" height="230"></canvas>'+
     '<div id="tgtip" class="tgtip" hidden></div></div>'+
+    '<h2>Var mandaten hamnar</h2>'+
+    '<div class="rub">Valkretsar och vilka som tar platserna</div>'+
+    '<div class="kort">'+vk+'</div>'+
     '<h2>Om stödet ändras</h2>'+
     '<div class="rub">Vad en procentenhet upp eller ner gör</div>'+
     '<div class="kort">'+
@@ -416,15 +574,13 @@ function rita(p){{
     'varifrån väljarna kommer.</p>'+
     '<div class="rulla"><table class="ktab">'+
     '<thead><tr><th>Ändring</th><th class="ta">Stöd</th>'+
-    '<th class="ta">Mandat</th><th>Vilka som påverkas</th></tr></thead>'+
+    '<th class="ta">Mandat</th><th>Vilka andra påverkas</th>'+
+    '<th>Var '+d.namn+' vinner eller tappar</th></tr></thead>'+
     '<tbody>'+kansl+'</tbody></table></div>'+
     '<p class="fot">Fyraprocentsspärren gör hoppen ojämna för små partier: '+
     'ett parti under spärren får inga mandat alls, och passerar det gränsen '+
     'hoppar det direkt till ett tjugotal.</p>'+
-    '</div>'+
-    '<h2>Var mandaten hamnar</h2>'+
-    '<div class="rub">Valkretsar och vilka som tar platserna</div>'+
-    '<div class="kort">'+vk+'</div>';
+    '</div>';
 
   hover=-1;
   ritaTrend(p);
