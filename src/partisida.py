@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 import config as cfg
+import modell
 
 ROT = Path(__file__).resolve().parent.parent
 
@@ -37,9 +38,59 @@ def _kandidater() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def _kanslighet(sammanfattning: pd.DataFrame) -> dict:
+    """Vad händer med mandaten om ett parti vinner eller tappar väljare?
+
+    För varje parti och varje förskjutning mellan minus tre och plus tre
+    procentenheter räknas mandaten om. De röster partiet vinner tas från
+    övriga partier i proportion till deras egen storlek, vilket är det
+    neutrala antagandet: utan information om varifrån väljarna kommer är det
+    enda rimliga att alla drabbas lika mycket relativt sett.
+
+    Fyraprocentsspärren gör kurvan språngvis för de små partierna.
+    Liberalerna går från noll till sexton mandat mellan plus en och plus två
+    procentenheter, eftersom de passerar spärren på vägen.
+    """
+    bas = {p: float(sammanfattning.set_index("parti").at[p, "prognos"])
+           for p in cfg.PARTIER}
+    utgangslage = modell.fordela_mandat(bas)
+
+    ut = {}
+    for parti in cfg.PARTIER:
+        rader = []
+        for delta in (-3.0, -2.0, -1.0, 1.0, 2.0, 3.0):
+            nytt = dict(bas)
+            nytt[parti] = max(0.0, bas[parti] + delta)
+
+            # Ett parti som redan ligger nära noll kan inte tappa hela beloppet.
+            faktiskt = nytt[parti] - bas[parti]
+            ovriga = {p: v for p, v in bas.items() if p != parti}
+            summa = sum(ovriga.values())
+            if summa > 0:
+                for p, v in ovriga.items():
+                    nytt[p] = max(0.0, v - faktiskt * v / summa)
+
+            mandat = modell.fordela_mandat(nytt)
+            forandring = {p: mandat[p] - utgangslage[p] for p in cfg.PARTIER
+                          if mandat[p] != utgangslage[p] and p != parti}
+            rader.append({
+                "d": delta,
+                "stod": round(nytt[parti], 1),
+                "mandat": mandat[parti],
+                "diff": mandat[parti] - utgangslage[parti],
+                "over": nytt[parti] >= cfg.SPARRGRANS * 100,
+                "andra": sorted(
+                    ({"p": p, "d": v} for p, v in forandring.items()),
+                    key=lambda x: (-abs(x["d"]), x["p"])),
+            })
+        ut[parti] = rader
+    return ut
+
+
 def _bygg_partidata(sammanfattning: pd.DataFrame, trend: pd.DataFrame,
                     kandidater: pd.DataFrame) -> dict:
     """Samlar allt per parti i en struktur som sidan kan rendera."""
+    kanslighet = _kanslighet(sammanfattning)
     ut = {}
     for _, rad in sammanfattning.iterrows():
         parti = rad["parti"]
@@ -96,6 +147,7 @@ def _bygg_partidata(sammanfattning: pd.DataFrame, trend: pd.DataFrame,
             "trend": [round(float(v), 2) for v in trend[parti]] if parti in trend.columns else [],
             "valkretsar": valkretsar,
             "antal_kandidater": int(len(kand)) if not kand.empty else 0,
+            "kanslighet": kanslighet.get(parti, []),
         }
     return ut
 
@@ -181,6 +233,24 @@ color:var(--svag);font-weight:700;margin-bottom:5px}}
 .ttp{{width:9px;height:9px;border-radius:2px;flex:none}}
 .ttn{{font-weight:700}}
 .ttv{{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}}
+.rulla{{overflow-x:auto}}
+.ktab{{width:100%;border-collapse:collapse;margin-top:16px;font-size:13.5px}}
+.ktab th{{text-align:left;font-size:10.5px;text-transform:uppercase;
+letter-spacing:1px;color:var(--svag);font-weight:700;padding:0 10px 7px 0;
+border-bottom:1px solid var(--linje);white-space:nowrap}}
+.ktab td{{padding:9px 10px 9px 0;border-bottom:1px solid var(--linje);
+vertical-align:middle}}
+.ktab tr:last-child td{{border-bottom:none}}
+.ktab tr.usparr td{{color:var(--svag)}}
+.kandr{{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}}
+.ku{{display:block;font-size:10px;color:var(--korall);font-weight:600}}
+.kd{{font-weight:700;font-variant-numeric:tabular-nums}}
+.kd.upp{{color:var(--gron)}}.kd.ned{{color:var(--korall)}}.kd.noll{{color:var(--svag)}}
+.kandra{{font-size:12.5px;line-height:2}}
+.kp{{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}}
+.ksep{{color:var(--linje);margin:0 7px}}
+.kingen{{color:var(--svag);font-style:italic}}
+.fot{{margin:14px 0 0;font-size:12px;color:var(--svag);line-height:1.6}}
 .vkrad{{display:grid;grid-template-columns:230px 1fr;gap:16px;padding:14px 0;
 border-top:1px solid var(--linje)}}
 .vknamn{{font-weight:700;font-size:14px}}
@@ -273,6 +343,7 @@ Mandatspannen anger var åtta av tio simuleringar hamnar. Genererad
 </div>
 <script>
 var D={data}, DATUM={datum}, valt='{forsta}';
+var FARG={{}}; for(var _p in D) FARG[_p]=D[_p].farg;
 
 function diff(v,enhet){{
   if(v===null||v===undefined) return '';
@@ -282,6 +353,20 @@ function diff(v,enhet){{
 
 function rita(p){{
   var d=D[p];
+  var kansl=(d.kanslighet||[]).map(function(r){{
+    var andra=r.andra.map(function(a){{
+      return '<span class="kp" style="background:'+(FARG[a.p]||'#888')+'"></span>'+
+             a.p+' <span class="kd '+(a.d>0?'upp':'ned')+'">'+
+             (a.d>0?'+':'')+a.d+'</span>';
+    }}).join('<span class="ksep">·</span>') || '<span class="kingen">ingen ändring</span>';
+    var kl=r.diff>0?'upp':(r.diff<0?'ned':'noll');
+    return '<tr'+(r.over?'':' class="usparr"')+'>'+
+      '<td class="kandr">'+(r.d>0?'+':'')+r.d.toFixed(0)+' pe</td>'+
+      '<td class="ta">'+r.stod.toFixed(1)+' %'+(r.over?'':'<span class="ku">under spärren</span>')+'</td>'+
+      '<td class="ta"><strong>'+r.mandat+'</strong>'+
+      (r.diff?' <span class="kd '+kl+'">'+(r.diff>0?'+':'')+r.diff+'</span>':'')+'</td>'+
+      '<td class="kandra">'+andra+'</td></tr>';
+  }}).join('');
   var vk=d.valkretsar.map(function(v){{
     var namn=v.kandidater.map(function(k){{
       var titel=k.n+(k.u?'\\n'+k.u:'')+
@@ -310,6 +395,21 @@ function rita(p){{
     '</div>'+
     '<canvas id="tg" height="230"></canvas>'+
     '<div id="tgtip" class="tgtip" hidden></div></div>'+
+    '<h2>Om stödet ändras</h2>'+
+    '<div class="rub">Vad en procentenhet upp eller ner gör</div>'+
+    '<div class="kort">'+
+    '<p class="besk">Om '+d.namn+' vinner eller tappar väljare måste rösterna '+
+    'komma någonstans ifrån. Här tas de från övriga partier i proportion till '+
+    'deras egen storlek, vilket är det neutrala antagandet när man inte vet '+
+    'varifrån väljarna kommer.</p>'+
+    '<div class="rulla"><table class="ktab">'+
+    '<thead><tr><th>Ändring</th><th class="ta">Stöd</th>'+
+    '<th class="ta">Mandat</th><th>Vilka som påverkas</th></tr></thead>'+
+    '<tbody>'+kansl+'</tbody></table></div>'+
+    '<p class="fot">Fyraprocentsspärren gör hoppen ojämna för små partier: '+
+    'ett parti under spärren får inga mandat alls, och passerar det gränsen '+
+    'hoppar det direkt till ett tjugotal.</p>'+
+    '</div>'+
     '<h2>Var mandaten hamnar</h2>'+
     '<div class="rub">Valkretsar och vilka som tar platserna</div>'+
     '<div class="kort">'+vk+'</div>';
