@@ -10,6 +10,18 @@ Du behöver bara ingripa i tre fall, beskrivna nedan.
 
 ---
 
+## Fall 0: En mätning som just publicerats
+
+Skraparen cachar Wikipediasidan i en timme. Har en mätning publicerats de
+senaste minuterna kan den alltså saknas. Gå då förbi cachen:
+
+```bash
+python3 src/prognos.py --tvinga
+```
+
+`--hamta` räcker annars. Cachen finns bara för att slippa hämta om vid
+upprepade körningar i följd.
+
 ## Fall 1: Du vill inte vänta till natten
 
 Gå till **Actions → Bygg och publicera valprognos → Run workflow**. Bygget tar
@@ -22,7 +34,8 @@ cd "/Users/erikgranberg/Desktop/Python/Election prediction/src"
 python3 prognos.py --hamta
 ```
 
-`--hamta` tvingar ny hämtning i stället för att använda cachen.
+`--hamta` hämtar nya mätningar. Cachen är en timme, så för en mätning som
+just publicerats används `--tvinga` i stället.
 
 ---
 

@@ -329,7 +329,10 @@ def backtest() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Svensk valprediktor")
-    ap.add_argument("--hamta", action="store_true", help="Tvinga ny hämtning från Wikipedia")
+    ap.add_argument("--hamta", action="store_true",
+                    help="Hämta nya mätningar från Wikipedia")
+    ap.add_argument("--tvinga", action="store_true",
+                    help="Gå förbi cachen helt, för en mätning som just publicerats")
     ap.add_argument("--backtest", action="store_true", help="Utvärdera mot valet 2022")
     ap.add_argument("--ingen-html", action="store_true", help="Hoppa över dashboarden")
     ap.add_argument("--korrigera", action="store_true",
@@ -352,9 +355,9 @@ def main() -> None:
         return
 
     fil = ROT / "data" / "matningar.csv"
-    if args.hamta or not fil.exists():
+    if args.hamta or args.tvinga or not fil.exists():
         print("Hämtar mätningar från Wikipedia...")
-        df_ny = scraper.skrapa(2026)
+        df_ny = scraper.skrapa(2026, cache=not args.tvinga)
         scraper.spara(df_ny, 2026)
         print(f"  {len(df_ny)} mätningar sparade.\n")
 

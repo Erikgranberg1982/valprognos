@@ -164,11 +164,23 @@ def _platta_kolumner(kolumner) -> list[str]:
     return ut
 
 
+# Hur länge en cachad sida får användas. Nära valdagen kommer mätningar
+# tätare än så, och en cache på flera timmar döljer dem: den 4 och 5
+# september fanns nya mätningar på Wikipedia som inte kom med i hämtningen.
+CACHE_TIMMAR = 1.0
+
+
 def hamta_html(cache: bool = True, valar: int = 2026) -> str:
+    """Hämtar Wikipediasidan, med en kort cache.
+
+    Cachen finns för att slippa hämta om vid upprepade körningar i följd, inte
+    för att spara bandbredd. Den är därför kort. `cache=False` går alltid till
+    Wikipedia.
+    """
     cachefil = ROT / "data" / f"wikipedia_cache_{valar}.html"
     if cache and cachefil.exists():
         alder = (datetime.now().timestamp() - cachefil.stat().st_mtime) / 3600
-        if alder < 6:
+        if alder < CACHE_TIMMAR:
             return cachefil.read_text(encoding="utf-8")
     svar = requests.get(wiki_url(valar), headers=HEADERS, timeout=30)
     svar.raise_for_status()
@@ -189,8 +201,8 @@ def _institut_for_tabell(tabell) -> str | None:
     return txt or None
 
 
-def skrapa(valar: int = 2026) -> pd.DataFrame:
-    html = hamta_html(valar=valar)
+def skrapa(valar: int = 2026, cache: bool = True) -> pd.DataFrame:
+    html = hamta_html(cache=cache, valar=valar)
     soup = BeautifulSoup(html, "lxml")
 
     rader = []
