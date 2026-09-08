@@ -302,6 +302,15 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
             if koal:
                 post["koal"] = koal
 
+            # Nuvarande styre, som jämförelsepunkt till de möjliga.
+            styre = kommunstyren.get(str(omrade).zfill(4)) if niva == "kommun" else None
+            if styre:
+                post["styre"] = {
+                    "p": styre["partier"],
+                    "m": styre["majoritet"],
+                    "kso": styre["kso"],
+                }
+
             # Namngivet lokalt parti, där en mätning finns.
             if rad.get("lokalt_parti"):
                 post["lokal"] = {
@@ -317,6 +326,7 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
 
     import lokala_koalitioner
     koalitioner_def = lokala_koalitioner.las()
+    kommunstyren = lokala_koalitioner.las_kommunstyren()
 
     # Valkretsarnas prognos, grupperad på kommunkod så att detaljvyn bara
     # behöver slå upp den kommun som visas.
@@ -1295,6 +1305,15 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .metodruta p {{ margin:0; font-size:13px; color:var(--svag); line-height:1.6; }}
 .koalblock {{ margin-top:22px; padding-top:20px;
   border-top:1px solid var(--linje); }}
+.nuvstyre {{ background:var(--panel); border-radius:12px; padding:14px 16px;
+  margin-bottom:18px; border-left:3px solid var(--korall); }}
+.nuvrub {{ font-size:11px; text-transform:uppercase; letter-spacing:1.2px;
+  font-weight:700; color:var(--korall); margin-bottom:8px; }}
+.nuvrad {{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }}
+.nuvp {{ display:inline-block; color:#fff; font-weight:700; font-size:12px;
+  padding:3px 10px; border-radius:20px; }}
+.nuvmaj {{ font-size:12px; color:var(--svag); margin-left:4px; }}
+.nuvnot {{ margin-top:9px; font-size:12.5px; color:var(--svag); line-height:1.6; }}
 .koalrubrik {{ font-size:12px; text-transform:uppercase; letter-spacing:1.3px;
   font-weight:700; color:var(--svag); margin-bottom:12px; }}
 .koalhuvud, .koalrad {{ display:grid;
@@ -2089,8 +2108,37 @@ const LOKAL = {lokal_json};
           '<div class="kstyr">' + (k.styr2022 || 0) + '</div>' +
           '</div>';
       }}).join('');
+      /* Det sittande styret som jämförelsepunkt. Ett styre är en politisk
+         överenskommelse och inte ett valresultat, så det syns inte i
+         mandaten: sextio kommuner styrs i minoritet. */
+      var nuvhtml = '';
+      if (post.styre && post.styre.p && post.styre.p.length) {{
+        var nuvp = post.styre.p.map(function(kod) {{
+          var f = FARG[kod] || '#8892a4';
+          return '<span class="nuvp" style="background:' + f + '">' +
+                 kod + '</span>';
+        }}).join('');
+        var mand = post.styre.p.reduce(function(sum, kod) {{
+          return sum + (post.mandat && post.mandat[kod] ? post.mandat[kod] : 0);
+        }}, 0);
+        var racker = mand >= post.majoritet;
+        nuvhtml =
+          '<div class="nuvstyre">' +
+            '<div class="nuvrub">Styr i dag</div>' +
+            '<div class="nuvrad">' + nuvp +
+              '<span class="nuvmaj">' + post.styre.m.toLowerCase() + '</span>' +
+            '</div>' +
+            '<div class="nuvnot">Samma partier skulle få <strong>' + mand +
+            '</strong> av ' + post.mandat_totalt + ' mandat i prognosen, ' +
+            (racker ? 'vilket räcker för egen majoritet.'
+                    : 'alltså under de ' + post.majoritet + ' som krävs.') +
+            '</div>' +
+          '</div>';
+      }}
+
       koalhtml =
         '<div class="koalblock">' +
+          nuvhtml +
           '<div class="koalrubrik">Möjliga styren</div>' +
           '<div class="koalhuvud"><span>Koalition</span><span></span>' +
           '<span>Mandat</span><span></span><span>Styr nu</span></div>' +

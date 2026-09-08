@@ -191,3 +191,34 @@ if __name__ == "__main__":
         marke = "JA " if post["har_majoritet"] else "nej"
         print(f"  {marke} {post['namn']:16s} {post['mandat']:3d} mandat "
               f"({post['avstand']:+d} mot majoritet)")
+
+
+# --- Nuvarande styre per kommun ------------------------------------------
+
+def las_kommunstyren() -> dict[str, dict]:
+    """Vilka partier som styr varje kommun i dag.
+
+    Källa är SKR:s sammanställning av styrena efter valet 2022, som är den
+    enda samlade förteckningen: SCB redovisar bara aggregat per blocktyp.
+    Ett styre är en politisk överenskommelse och inte ett valresultat, så det
+    går inte att härleda ur mandaten. Sextio kommuner styrs i minoritet, och
+    i flera fall styr inte den största konstellationen.
+
+    Uppgifterna gäller läget 30 juni 2026 och ändras när ett styre spricker.
+    """
+    fil = ROT / "data" / "kommunstyren_2022.csv"
+    if not fil.exists():
+        return {}
+    ut = {}
+    with open(fil, encoding="utf-8") as f:
+        for rad in csv.DictReader(f):
+            kod = (rad.get("kommunkod") or "").strip()
+            partier = [p for p in (rad.get("partier") or "").split("+") if p]
+            if not kod or not partier:
+                continue
+            ut[kod] = {
+                "partier": partier,
+                "majoritet": (rad.get("majoritet") or "").strip(),
+                "kso": (rad.get("kso_parti") or "").strip(),
+            }
+    return ut
