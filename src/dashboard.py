@@ -1305,15 +1305,12 @@ tr.klickbar:hover .radpil .pil {{ transform:translateX(2px); }}
 .metodruta p {{ margin:0; font-size:13px; color:var(--svag); line-height:1.6; }}
 .koalblock {{ margin-top:22px; padding-top:20px;
   border-top:1px solid var(--linje); }}
-.nuvstyre {{ background:var(--panel); border-radius:12px; padding:14px 16px;
-  margin-bottom:18px; border-left:3px solid var(--korall); }}
-.nuvrub {{ font-size:11px; text-transform:uppercase; letter-spacing:1.2px;
-  font-weight:700; color:var(--korall); margin-bottom:8px; }}
-.nuvrad {{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }}
-.nuvp {{ display:inline-block; color:#fff; font-weight:700; font-size:12px;
-  padding:3px 10px; border-radius:20px; }}
-.nuvmaj {{ font-size:12px; color:var(--svag); margin-left:4px; }}
-.nuvnot {{ margin-top:9px; font-size:12.5px; color:var(--svag); line-height:1.6; }}
+.koalrad.nuvarande {{ background:var(--panel); border-left:3px solid var(--korall);
+  padding-left:11px; margin-left:-14px; border-radius:0 8px 8px 0; }}
+.koalrad.nuvarande .knamn {{ font-weight:700; }}
+.knuvdiff {{ font-size:11px; font-weight:700; margin-left:5px; }}
+.knuvdiff.upp {{ color:var(--gron); }}
+.knuvdiff.ned {{ color:var(--korall); }}
 .koalrubrik {{ font-size:12px; text-transform:uppercase; letter-spacing:1.3px;
   font-weight:700; color:var(--svag); margin-bottom:12px; }}
 .koalhuvud, .koalrad {{ display:grid;
@@ -2108,42 +2105,55 @@ const LOKAL = {lokal_json};
           '<div class="kstyr">' + (k.styr2022 || 0) + '</div>' +
           '</div>';
       }}).join('');
-      /* Det sittande styret som jämförelsepunkt. Ett styre är en politisk
-         överenskommelse och inte ett valresultat, så det syns inte i
-         mandaten: sextio kommuner styrs i minoritet. */
-      var nuvhtml = '';
+      /* Det sittande styret läggs in som en egen rad i samma tabell, så att
+         mandaten går att jämföra direkt med alternativen. Ett styre är en
+         politisk överenskommelse och inte ett valresultat: hundratretton av
+         290 kommuner styrs i minoritet, så raden kan mycket väl ligga under
+         majoritetsstrecket. */
+      var nuvrad = '';
       if (post.styre && post.styre.p && post.styre.p.length) {{
-        var nuvp = post.styre.p.map(function(kod) {{
-          var f = FARG[kod] || '#8892a4';
-          return '<span class="nuvp" style="background:' + f + '">' +
-                 kod + '</span>';
-        }}).join('');
-        var mand = post.styre.p.reduce(function(sum, kod) {{
+        var sp = post.styre.p;
+        var mand = sp.reduce(function(sum, kod) {{
           return sum + (post.mandat && post.mandat[kod] ? post.mandat[kod] : 0);
         }}, 0);
-        var racker = mand >= post.majoritet;
-        nuvhtml =
-          '<div class="nuvstyre">' +
-            '<div class="nuvrub">Styr i dag</div>' +
-            '<div class="nuvrad">' + nuvp +
-              '<span class="nuvmaj">' + post.styre.m.toLowerCase() + '</span>' +
-            '</div>' +
-            '<div class="nuvnot">Samma partier skulle få <strong>' + mand +
-            '</strong> av ' + post.mandat_totalt + ' mandat i prognosen, ' +
-            (racker ? 'vilket räcker för egen majoritet.'
-                    : 'alltså under de ' + post.majoritet + ' som krävs.') +
-            '</div>' +
+        var forr = sp.reduce(function(sum, kod) {{
+          var d = post.mandatdiff && post.mandatdiff[kod];
+          return sum + (typeof d === 'number' ? d : 0);
+        }}, 0);
+        var harMaj = mand >= post.majoritet;
+        var nmarke = harMaj
+          ? '<span class="kmarke ja">Majoritet</span>'
+          : '<span class="kmarke nej">' + (mand - post.majoritet) + '</span>';
+        var nbredd = Math.min(100, mand / post.mandat_totalt * 100);
+        var andring = forr === 0 ? '' :
+          '<span class="knuvdiff ' + (forr > 0 ? 'upp' : 'ned') + '">' +
+          (forr > 0 ? '+' : '') + forr + '</span>';
+        nuvrad =
+          '<div class="koalrad nuvarande' + (harMaj ? ' vinner' : '') + '">' +
+            '<div class="knamn">Styr i dag' +
+              '<span class="kpartier">' + sp.join('+') + ' · ' +
+              post.styre.m.toLowerCase() + '</span></div>' +
+            '<div class="kbar"><div class="kfyll" style="width:' +
+              nbredd.toFixed(1) + '%"></div><div class="kgrans" style="left:' +
+              (post.majoritet / post.mandat_totalt * 100).toFixed(2) +
+              '%"></div></div>' +
+            '<div class="kmandat">' + mand + andring + '</div>' +
+            '<div class="kstatus">' + nmarke + '</div>' +
+            '<div class="kstyr">–</div>' +
           '</div>';
       }}
 
       koalhtml =
         '<div class="koalblock">' +
-          nuvhtml +
           '<div class="koalrubrik">Möjliga styren</div>' +
           '<div class="koalhuvud"><span>Koalition</span><span></span>' +
           '<span>Mandat</span><span></span><span>Styr nu</span></div>' +
-          rader +
-          '<p class="koalnot">Talet i sista kolumnen är hur många ' +
+          nuvrad + rader +
+          '<p class="koalnot">Raden överst är det styre som sitter i dag, med ' +
+          'förändringen i mandat sedan förra valet. Ett styre är en politisk ' +
+          'överenskommelse och inte ett valresultat: hundratretton av 290 ' +
+          'kommuner styrs i minoritet, så raden kan ligga under strecket. ' +
+          'Talet i sista kolumnen är hur många ' +
           (niva === 'kommun' ? 'kommuner' : 'regioner') + ' koalitionen faktiskt ' +
           'styr under mandatperioden 2022 till 2026. Prognosen visar var den ' +
           'skulle kunna nå majoritet, inte var partierna vill styra ihop.</p>' +
