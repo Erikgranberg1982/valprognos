@@ -220,5 +220,9 @@ def las_kommunstyren() -> dict[str, dict]:
                 "partier": partier,
                 "majoritet": (rad.get("majoritet") or "").strip(),
                 "kso": (rad.get("kso_parti") or "").strip(),
+                # SKR skriver ÖP för alla lokala partier. Det faktiska namnet
+                # står i en egen kolumn: Tullingepartiet i Botkyrka,
+                # Lidingöpartiet på Lidingö, Väsbys Bästa i Upplands Väsby.
+                "lokalt_namn": (rad.get("lokalt_partinamn") or "").strip(),
             }
     return ut

@@ -310,6 +310,8 @@ def _lokal_sektion(regioner: pd.DataFrame | None,
                     "m": styre["majoritet"],
                     "kso": styre["kso"],
                 }
+                if styre.get("lokalt_namn"):
+                    post["styre"]["lokalnamn"] = styre["lokalt_namn"]
 
             # Namngivet lokalt parti, där en mätning finns.
             if rad.get("lokalt_parti"):
@@ -2113,11 +2115,18 @@ const LOKAL = {lokal_json};
       var nuvrad = '';
       if (post.styre && post.styre.p && post.styre.p.length) {{
         var sp = post.styre.p;
+        /* SKR:s ÖP är ett lokalt parti, som modellen räknar i ÖVRIGA. Utan
+           översättningen fick styret noll mandat för den delen: Ale styrs av
+           M, KD, SD och Framtid i Ale men visades med 22 av 49 mandat i
+           stället för 25. ÖVRIGA kan rymma flera partier, så siffran är en
+           övre gräns när det finns fler lokala partier i fullmäktige. */
+        function mkod(kod) {{ return kod === 'ÖP' ? 'ÖVRIGA' : kod; }}
         var mand = sp.reduce(function(sum, kod) {{
-          return sum + (post.mandat && post.mandat[kod] ? post.mandat[kod] : 0);
+          var k = mkod(kod);
+          return sum + (post.mandat && post.mandat[k] ? post.mandat[k] : 0);
         }}, 0);
         var forr = sp.reduce(function(sum, kod) {{
-          var d = post.mandatdiff && post.mandatdiff[kod];
+          var d = post.mandatdiff && post.mandatdiff[mkod(kod)];
           return sum + (typeof d === 'number' ? d : 0);
         }}, 0);
         var harMaj = mand >= post.majoritet;
@@ -2131,7 +2140,11 @@ const LOKAL = {lokal_json};
         nuvrad =
           '<div class="koalrad nuvarande' + (harMaj ? ' vinner' : '') + '">' +
             '<div class="knamn">Styr i dag' +
-              '<span class="kpartier">' + sp.join('+') + ' · ' +
+              '<span class="kpartier">' +
+              sp.map(function(kod) {{
+                return kod === 'ÖP' && post.styre.lokalnamn
+                  ? post.styre.lokalnamn : kod;
+              }}).join('+') + ' · ' +
               post.styre.m.toLowerCase() + '</span></div>' +
             '<div class="kbar"><div class="kfyll" style="width:' +
               nbredd.toFixed(1) + '%"></div><div class="kgrans" style="left:' +
@@ -2153,6 +2166,11 @@ const LOKAL = {lokal_json};
           'förändringen i mandat sedan förra valet. Ett styre är en politisk ' +
           'överenskommelse och inte ett valresultat: hundratretton av 290 ' +
           'kommuner styrs i minoritet, så raden kan ligga under strecket. ' +
+          (post.styre && post.styre.lokalnamn
+            ? 'Modellen skattar inte lokala partier var för sig, så mandaten ' +
+              'för ' + post.styre.lokalnamn + ' är hela ÖVRIGA och kan vara ' +
+              'för många om fler lokala partier sitter i fullmäktige. '
+            : '') +
           'Talet i sista kolumnen är hur många ' +
           (niva === 'kommun' ? 'kommuner' : 'regioner') + ' koalitionen faktiskt ' +
           'styr under mandatperioden 2022 till 2026. Prognosen visar var den ' +
