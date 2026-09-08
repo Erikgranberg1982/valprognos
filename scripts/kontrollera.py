@@ -164,6 +164,27 @@ def main() -> None:
             fel(f"{namn} visar {sorted(avvikande)} dagar till valdagen, "
                 f"väntat {vantat}.")
 
+    # Kommun- och regionprognosen byggs i ett steg som fångar undantag, så att
+    # ett SCB-avbrott inte fäller hela bygget. Konsekvensen blev att sidan
+    # publicerades med noll kommuner den 8 september. Kontrollen måste därför
+    # granska resultatet och inte bara att filen finns.
+    import json as _json
+    if not kommuner.exists():
+        fel("kommuner.json saknas. Kommunprognosen byggdes inte.")
+    try:
+        kdata = _json.loads(kommuner.read_text(encoding="utf-8"))
+    except Exception as e:
+        fel(f"kommuner.json går inte att läsa: {e}")
+    krader = kdata if isinstance(kdata, list) else kdata.get("kommuner", [])
+    if len(krader) < 250:
+        fel(f"kommuner.json innehåller {len(krader)} kommuner, väntat 290. "
+            "SCB kan ha brutit anslutningen under bygget.")
+
+    sida_txt = (ROT / "output" / "index.html").read_text(encoding="utf-8")
+    m_antal = _re.search(r'"kommun_antal":\s*(\d+)', sida_txt)
+    if m_antal and int(m_antal.group(1)) < 250:
+        fel(f"index.html bäddar in {m_antal.group(1)} kommuner, väntat 290.")
+
     print(f"Kontroll godkänd: {len(df)} mätningar från {institut} institut, "
           f"senaste {df['datum'].max().date()}.")
     print(f"  Prognos: " + ", ".join(f"{p} {snitt[p]:.1f}" for p in PARTIER))

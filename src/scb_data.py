@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv as _csv
 import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -61,18 +62,40 @@ LANDSDEL_TILL_REGION = {
 }
 
 
+# SCB:s API stänger då och då anslutningen utan svar, särskilt vid många
+# anrop i följd. Lokalt märks det inte eftersom cachen ligger kvar mellan
+# körningar, men i CI hämtas allt från början varje gång: den 8 september
+# föll kommunprognosen bort helt och sidan publicerades med noll kommuner.
+FORSOK = 4
+PAUS_SEKUNDER = 3.0
+
+
 def _post(tabell: str, query: list, cachenamn: str, tvinga: bool = False) -> dict:
     CACHE.mkdir(parents=True, exist_ok=True)
     fil = CACHE / f"{cachenamn}.json"
     if fil.exists() and not tvinga:
         return json.loads(fil.read_text(encoding="utf-8"))
-    svar = requests.post(f"{BAS}/{tabell}", headers=HEADERS,
-                         json={"query": query, "response": {"format": "json"}},
-                         timeout=90)
-    svar.raise_for_status()
-    data = svar.json()
-    fil.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    return data
+
+    sista = None
+    for forsok in range(FORSOK):
+        try:
+            svar = requests.post(
+                f"{BAS}/{tabell}", headers=HEADERS,
+                json={"query": query, "response": {"format": "json"}},
+                timeout=90)
+            svar.raise_for_status()
+            data = svar.json()
+            fil.write_text(json.dumps(data, ensure_ascii=False),
+                           encoding="utf-8")
+            return data
+        except (requests.exceptions.RequestException, ValueError) as fel:
+            sista = fel
+            if forsok < FORSOK - 1:
+                # Växande paus: SCB begränsar takten och blir tillgängligt
+                # igen efter en stund.
+                time.sleep(PAUS_SEKUNDER * (forsok + 1))
+    raise RuntimeError(
+        f"SCB svarade inte för {tabell} efter {FORSOK} försök: {sista}")
 
 
 def _till_dataframe(data: dict, kolumner: list[str]) -> pd.DataFrame:
