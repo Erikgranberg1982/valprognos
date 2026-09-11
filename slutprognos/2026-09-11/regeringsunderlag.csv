@@ -1,0 +1,13 @@
+underlag,mandat,majoritet,sannolikhet
+V+S+MP+C,190,True,
+M+KD+L+SD,159,False,
+Mittenkoalition S+M+C+L,200,True,1.0
+"S-ledd regering med V, MP och C",187,True,0.8627
+S+C+KD+MP,182,True,0.7927
+Fortsatt Tidöstyre (M+KD+L med SD-stöd),162,False,0.1373
+Blocköverskridande S+M,166,False,0.0578
+S-ledd minoritet utan C,159,False,0.0259
+S+MP+C,158,False,0.0149
+M+KD+SD utan L,156,False,0.0037
+S+C+KD,154,False,0.0001
+Alliansen (M+KD+C+L),119,False,0.0

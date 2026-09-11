@@ -1,0 +1,50 @@
+scenario,scenario_namn,parti,stod,mandat,mandat_huvudprognos
+l_over_sparren,Liberalerna klarar spärren,V,8.12,28,30
+l_over_sparren,Liberalerna klarar spärren,S,28.78,100,105
+l_over_sparren,Liberalerna klarar spärren,MP,7.53,26,27
+l_over_sparren,Liberalerna klarar spärren,C,6.81,24,28
+l_over_sparren,Liberalerna klarar spärren,L,5.81,20,0
+l_over_sparren,Liberalerna klarar spärren,M,17.1,60,64
+l_over_sparren,Liberalerna klarar spärren,KD,6.18,22,24
+l_over_sparren,Liberalerna klarar spärren,SD,19.66,69,71
+orebropartiet_valkrets,Örebropartiet in via valkretsen,V,8.1,29,30
+orebropartiet_valkrets,Örebropartiet in via valkretsen,S,28.83,105,105
+orebropartiet_valkrets,Örebropartiet in via valkretsen,MP,7.52,27,27
+orebropartiet_valkrets,Örebropartiet in via valkretsen,C,7.69,28,28
+orebropartiet_valkrets,Örebropartiet in via valkretsen,L,3.84,0,0
+orebropartiet_valkrets,Örebropartiet in via valkretsen,M,17.42,63,64
+orebropartiet_valkrets,Örebropartiet in via valkretsen,KD,6.59,24,24
+orebropartiet_valkrets,Örebropartiet in via valkretsen,SD,19.48,71,71
+orebropartiet_valkrets,Örebropartiet in via valkretsen,ÖP,,2,0
+sommartrend,Sommartrenden håller i sig,V,7.42,26,30
+sommartrend,Sommartrenden håller i sig,S,28.16,98,105
+sommartrend,Sommartrenden håller i sig,MP,7.32,26,27
+sommartrend,Sommartrenden håller i sig,C,8.44,29,28
+sommartrend,Sommartrenden håller i sig,L,4.04,14,0
+sommartrend,Sommartrenden håller i sig,M,17.69,62,64
+sommartrend,Sommartrenden håller i sig,KD,7.09,25,24
+sommartrend,Sommartrenden håller i sig,SD,19.85,69,71
+senaste_veckan,Bara den senaste veckan,V,7.99,28,30
+senaste_veckan,Bara den senaste veckan,S,28.32,99,105
+senaste_veckan,Bara den senaste veckan,MP,7.48,26,27
+senaste_veckan,Bara den senaste veckan,C,8.06,28,28
+senaste_veckan,Bara den senaste veckan,L,4.75,17,0
+senaste_veckan,Bara den senaste veckan,M,17.6,61,64
+senaste_veckan,Bara den senaste veckan,KD,6.58,23,24
+senaste_veckan,Bara den senaste veckan,SD,19.22,67,71
+samma_valspurt,Samma valspurt som 2022,V,6.91,25,30
+samma_valspurt,Samma valspurt som 2022,S,30.53,110,105
+samma_valspurt,Samma valspurt som 2022,MP,7.16,26,27
+samma_valspurt,Samma valspurt som 2022,C,7.44,27,28
+samma_valspurt,Samma valspurt som 2022,L,3.2,0,0
+samma_valspurt,Samma valspurt som 2022,M,18.84,68,64
+samma_valspurt,Samma valspurt som 2022,KD,5.82,21,24
+samma_valspurt,Samma valspurt som 2022,SD,20.09,72,71
+snitt_valspurt,Genomsnittlig valspurt,V,6.94,25,30
+snitt_valspurt,Genomsnittlig valspurt,S,30.5,110,105
+snitt_valspurt,Genomsnittlig valspurt,MP,6.36,23,27
+snitt_valspurt,Genomsnittlig valspurt,C,7.92,29,28
+snitt_valspurt,Genomsnittlig valspurt,L,3.19,0,0
+snitt_valspurt,Genomsnittlig valspurt,M,18.36,66,64
+snitt_valspurt,Genomsnittlig valspurt,KD,6.72,24,24
+snitt_valspurt,Genomsnittlig valspurt,SD,20.01,72,71
