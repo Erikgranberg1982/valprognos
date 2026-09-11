@@ -305,6 +305,7 @@ def skriv(katalog: Path, sammanfattning: pd.DataFrame,
 
     html = _MALL.format(
         ga=cfg.google_analytics(),
+        valdag=cfg.VALDAG,
         seo_taggar=_seo_taggar(meta.get('dagar_kvar', 0),
                                meta.get('antal_matningar', 0)),
         flikar=flikar,
@@ -432,9 +433,22 @@ padding:5px 11px 5px 8px;border:1px solid var(--kant,rgba(0,0,0,.12));
 border-radius:99px;background:var(--panel);transition:.15s}}
 .tbaka:hover{{background:var(--korall);color:#fff;border-color:var(--korall)}}
 .vk em{{font-style:normal;font-weight:600;color:var(--text)}}
-</style></head><body>
+</style><script>
+/* Nedräkningen räknas om i webbläsaren, annars fryser den vid byggtiden. */
+(function () {{
+  var valdag = new Date('{valdag}T00:00:00');
+  var idag = new Date();
+  idag.setHours(0, 0, 0, 0);
+  var dagar = Math.round((valdag - idag) / 86400000);
+  var el = document.querySelectorAll('[data-nedrakning]');
+  var text = dagar > 1 ? dagar + ' dagar till valdagen'
+    : (dagar === 1 ? '1 dag till valdagen'
+    : (dagar === 0 ? 'Valdagen är i dag' : Math.abs(dagar) + ' dagar sedan valdagen'));
+  for (var i = 0; i < el.length; i++) el[i].textContent = text;
+}})();
+</script></head><body>
 <header><div class="w"><a class="tbaka" href="index.html"><span>&#8592;</span> Tillbaka till prognosen</a><h1>Partierna i riksdagsvalet 2026</h1>
-<div class="sub">{dagar} dagar till valdagen · {matningar} mätningar i modellen</div>
+<div class="sub"><span data-nedrakning>{dagar} dagar till valdagen</span> · {matningar} mätningar i modellen</div>
 </div></header>
 <div class="w">
 <div class="flikar">{flikar}</div>

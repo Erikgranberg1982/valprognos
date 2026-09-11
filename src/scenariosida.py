@@ -59,6 +59,7 @@ def skriv(katalog: Path, baslinje, meta: dict, matningar=None) -> Path:
         dagar=meta.get("dagar_kvar", ""),
         matningar=meta.get("antal_matningar", 0),
         antal=len(utfall),
+        valdag=cfg.VALDAG,
         seo_taggar=_seo_taggar(meta, len(utfall)),
     )
     katalog.mkdir(parents=True, exist_ok=True)
@@ -580,11 +581,24 @@ pointer-events:none;opacity:0;transition:opacity .08s}}
   .sflik{{flex:1 1 100%}}
   .tab{{font-size:12.5px}}
 }}
-</style></head><body>
+</style><script>
+/* Nedräkningen räknas om i webbläsaren, annars fryser den vid byggtiden. */
+(function () {{
+  var valdag = new Date('{valdag}T00:00:00');
+  var idag = new Date();
+  idag.setHours(0, 0, 0, 0);
+  var dagar = Math.round((valdag - idag) / 86400000);
+  var el = document.querySelectorAll('[data-nedrakning]');
+  var text = dagar > 1 ? dagar + ' dagar till valdagen'
+    : (dagar === 1 ? '1 dag till valdagen'
+    : (dagar === 0 ? 'Valdagen är i dag' : Math.abs(dagar) + ' dagar sedan valdagen'));
+  for (var i = 0; i < el.length; i++) el[i].textContent = text;
+}})();
+</script></head><body>
 <header><div class="w">
 <a class="tbaka" href="index.html"><span>&#8592;</span> Tillbaka till prognosen</a>
 <h1>Scenarier för riksdagsvalet</h1>
-<div class="sub">{antal} tänkta utfall · {dagar} dagar till valdagen ·
+<div class="sub">{antal} tänkta utfall · <span data-nedrakning>{dagar} dagar till valdagen</span> ·
 {matningar} mätningar i modellen</div>
 </div></header>
 <div class="w">

@@ -1458,8 +1458,8 @@ footer strong {{ color:var(--text); }}
   {meta['antal_institut']} institut, justerade för husfaktorer och simulerade
   {sim_text} gånger.</p>
   <div class="nyckeltal">
-    <div class="nyckel"><div class="n">{meta['dagar_kvar']}</div>
-      <div class="e">dagar till valdagen</div></div>
+    <div class="nyckel"><div class="n" data-nedrakning>{meta['dagar_kvar']}</div>
+      <div class="e" data-nedrakning-text>dagar till valdagen</div></div>
     <div class="nyckel"><div class="n">{meta['antal_matningar']}</div>
       <div class="e">mätningar i modellen</div></div>
     <div class="nyckel"><div class="n">{meta['antal_institut']}</div>
@@ -1602,6 +1602,26 @@ partiet högre än konsensus. Modellen korrigerar bort
 
 </div>
 <script>
+/* Nedräkningen räknas om i webbläsaren. Annars fryser den vid byggtiden:
+   en sida byggd på torsdagen visar fortfarande tre dagar på lördagen. Det
+   serverrenderade talet står kvar som utgångsvärde om skriptet inte kör. */
+(function () {{
+  var valdag = new Date('{cfg.VALDAG}T00:00:00');
+  var idag = new Date();
+  idag.setHours(0, 0, 0, 0);
+  var dagar = Math.round((valdag - idag) / 86400000);
+  var tal = document.querySelectorAll('[data-nedrakning]');
+  var txt = document.querySelectorAll('[data-nedrakning-text]');
+  for (var i = 0; i < tal.length; i++) {{
+    tal[i].textContent = Math.abs(dagar);
+  }}
+  for (var j = 0; j < txt.length; j++) {{
+    txt[j].textContent = dagar > 1 ? 'dagar till valdagen'
+      : (dagar === 1 ? 'dag till valdagen'
+      : (dagar === 0 ? 'valdagen är i dag' : 'dagar sedan valdagen'));
+  }}
+}})();
+
 const T = {trend_json};
 const ALLA = {alla_json};
 const PARTIER = {partier_json};
