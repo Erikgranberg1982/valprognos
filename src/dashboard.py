@@ -1490,7 +1490,7 @@ footer strong {{ color:var(--text); }}
   </a>
   <a class="fkort" href="scenarier_2026.html">
     <div class="ftitel">Scenarier {_pil()}</div>
-    <div class="ftext">Om L klarar spärren, om sommartrenden håller, om valspurten upprepar sig</div>
+    <div class="ftext">Om L klarar spärren, om bara senaste veckan räknas, om valspurten upprepar sig</div>
   </a>
 </div>
 <h2>Prognos</h2>

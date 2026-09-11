@@ -210,6 +210,56 @@ def _spurtunderlag(u: dict, farger: dict) -> str:
   </div>'''
 
 
+def _fonsterunderlag(u: dict, farger: dict) -> str:
+    """Visar vilka mätningar som ligger i det korta fönstret."""
+    info = u["scenario"].fonsterdata
+    if not info:
+        return ""
+
+    huvuden = "".join(f'<th class="ta">{p}</th>' for p in cfg.PARTIER)
+    rader = []
+    for r in info["matningar"]:
+        urval = f'{r["urval"]:,}'.replace(",", "\u00a0") if r["urval"] else "–"
+        celler = "".join(f'<td class="ta">{r[p]:.1f}</td>' for p in cfg.PARTIER)
+        rader.append(f'<tr><td>{r["institut"]}</td>'
+                     f'<td class="ta">{r["datum"]}</td>'
+                     f'<td class="ta">{urval}</td>{celler}</tr>')
+
+    slut = "".join(f'<td class="ta"><strong>{u["roster_nytt"][p]:.1f}</strong></td>'
+                   for p in cfg.PARTIER)
+    rader.append(f'<tr class="lutrad"><td><strong>Sammanvägt</strong></td>'
+                 f'<td class="ta">–</td><td class="ta">–</td>{slut}</tr>')
+
+    bas = "".join(f'<td class="ta">{u["roster_bas"][p]:.1f}</td>'
+                  for p in cfg.PARTIER)
+    rader.append(f'<tr><td>Huvudprognosen</td><td class="ta">alla</td>'
+                 f'<td class="ta">–</td>{bas}</tr>')
+
+    inst = info["institut"]
+    instlista = (", ".join(inst[:-1]) + " och " + inst[-1]
+                 if len(inst) > 1 else "".join(inst))
+
+    return f'''
+  <h2>Underlaget</h2>
+  <div class="rub">Mätningarna i fönstret</div>
+  <div class="kort">
+    <p class="besk">{info["antal"]} mätningar från
+    {instlista} mellan {info["forsta"]} och
+    {info["sista"]}. Samma viktning som i huvudprognosen, men allt äldre än
+    {info["dagar"]} dagar är uteslutet.</p>
+    <div class="rulla">
+    <table class="tab">
+      <thead><tr><th>Institut</th><th class="ta">Datum</th>
+      <th class="ta">Urval</th>{huvuden}</tr></thead>
+      <tbody>{"".join(rader)}</tbody>
+    </table>
+    </div>
+    <p class="fot">Sista raden är huvudprognosen, som väger in samtliga
+    mätningar inom tidsfönstret med tjugoen dagars halveringstid. Skillnaden
+    mellan de två raderna är vad scenariot handlar om.</p>
+  </div>'''
+
+
 def _trendunderlag(u: dict, farger: dict) -> str:
     """Visar de mätningar trendlinjen bygger på och lutningen per parti."""
     info = u["scenario"].trenddata
@@ -374,6 +424,8 @@ def _panel(u: dict, farger: dict, dold: bool) -> str:
     vr_html = _valkretsrakning(u, farger) if s.valkretsparti else ""
     if s.trend:
         vr_html = _trendunderlag(u, farger)
+    elif getattr(s, "fonster_dagar", None):
+        vr_html = _fonsterunderlag(u, farger)
     elif s.valspurt:
         vr_html = _spurtunderlag(u, farger)
 

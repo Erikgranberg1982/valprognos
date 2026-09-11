@@ -66,6 +66,8 @@ class Scenario:
     trenddata: dict = field(default_factory=dict)
     valspurt: list[int] | None = None
     spurtdata: dict = field(default_factory=dict)
+    fonster_dagar: int | None = None
+    fonsterdata: dict = field(default_factory=dict)
 
 
 def historiska_spurter() -> dict[int, dict]:
@@ -175,6 +177,49 @@ def valspurt(baslinje, dagar_kvar: int, ar: list[int]) -> tuple[dict, dict]:
         "obalanserad_summa": summa,
     }
     return normaliserad, info
+
+
+def kort_fonster(matningar, dagar: int) -> tuple[dict, dict]:
+    """Kör sammanvägningen på enbart de senaste dagarnas mätningar.
+
+    Samma viktning som i huvudprognosen, alltså institutens kvalitet,
+    urvalsstorlek och husfaktorer. Skillnaden är att allt äldre än
+    tidsfönstret utesluts helt i stället för att väga mindre.
+
+    Modellens halveringstid är tjugoen dagar, vilket är kalibrerat för att ge
+    lägst fel över hela valrörelsen. Nära valdagen betyder det att mätningar
+    från augusti fortfarande väger, och en snabb sen rörelse slår igenom
+    långsamt. Det här scenariot visar vad som händer om man litar helt på de
+    färskaste siffrorna.
+    """
+    import prognos as _prognos
+
+    grans = pd.Timestamp(date.today() - timedelta(days=dagar))
+    urval = matningar[matningar["datum"] >= grans]
+    if len(urval) < 3:
+        raise ValueError(
+            f"Bara {len(urval)} mätningar de senaste {dagar} dagarna.")
+
+    ref = min(matningar["datum"].max().date(), date.today())
+    res = _prognos.kor_prognos(urval, ref, date.fromisoformat(cfg.VALDAG),
+                               idag=date.today())
+    snitt = {p: float(res["snitt"][p]) for p in cfg.PARTIER}
+
+    rader = urval.sort_values("datum", ascending=False)
+    info = {
+        "dagar": dagar,
+        "antal": len(urval),
+        "institut": sorted(rader["institut"].unique().tolist()),
+        "forsta": rader["datum"].min().date().isoformat(),
+        "sista": rader["datum"].max().date().isoformat(),
+        "matningar": [
+            {"institut": str(r["institut"]),
+             "datum": r["datum"].date().isoformat(),
+             "urval": int(r["urval"]) if pd.notna(r["urval"]) else None,
+             **{p: float(r[p]) for p in cfg.PARTIER}}
+            for _, r in rader.iterrows()],
+    }
+    return snitt, info
 
 
 def trendforflyttning(matningar) -> tuple[dict, dict]:
@@ -295,6 +340,32 @@ SCENARIER = [
             "väger alla institut, korrigerar för husfaktorer och simulerar "
             "utfallet, och är därför en bättre gissning om vad som faktiskt "
             "händer. Trenden svarar bara på vad riktningen pekar mot."
+        ),
+    ),
+    Scenario(
+        id="senaste_veckan",
+        namn="Bara den senaste veckan",
+        fraga="Vad händer om de färskaste mätningarna väger tyngst?",
+        beskrivning=(
+            "Huvudprognosen väger in mätningar med tjugoen dagars "
+            "halveringstid, vilket är kalibrerat för att ge lägst fel över "
+            "hela valrörelsen. Nära valdagen betyder det att siffror från "
+            "augusti fortfarande räknas, och en snabb sen rörelse slår igenom "
+            "långsamt. Scenariot kör samma beräkning på enbart de senaste sju "
+            "dagarnas mätningar: samma institutsvikter, samma husfaktorer, "
+            "men allt äldre utesluts."
+        ),
+        fonster_dagar=7,
+        forbehall=(
+            "Färre mätningar betyder mer brus. Ett enskilt instituts "
+            "husfaktor får stort genomslag när underlaget krymper från "
+            "sjuttiotalet mätningar till en handfull, och en utstickare kan "
+            "ensam flytta ett parti över eller under spärren. Backtest mot "
+            "2018 och 2022 visar dessutom att kortare tidsfönster ger sämre "
+            "träffsäkerhet, inte bättre: vid sju dagars halveringstid steg "
+            "medelabsolutfelet jämfört med tjugoen. Scenariot är alltså inte "
+            "en bättre prognos utan en bild av vad de färskaste siffrorna "
+            "säger var för sig."
         ),
     ),
     Scenario(
@@ -428,6 +499,11 @@ def kor(scenario: Scenario, baslinje: pd.Series,
             raise ValueError("Trendscenariot behöver mätningarna.")
         nytt, info = trendforflyttning(matningar)
         scenario.trenddata = info
+    elif scenario.fonster_dagar:
+        if matningar is None:
+            raise ValueError("Fönsterscenariot behöver mätningarna.")
+        nytt, info = kort_fonster(matningar, scenario.fonster_dagar)
+        scenario.fonsterdata = info
     elif scenario.valspurt:
         if dagar_kvar is None:
             raise ValueError("Valspurtscenariot behöver antal dagar kvar.")
@@ -488,7 +564,7 @@ def kor_alla(baslinje: pd.Series,
              dagar_kvar: int | None = None) -> list[dict]:
     ut = []
     for s in SCENARIER:
-        if s.trend and matningar is None:
+        if (s.trend or s.fonster_dagar) and matningar is None:
             continue
         if s.valspurt and dagar_kvar is None:
             continue
