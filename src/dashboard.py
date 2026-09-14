@@ -1488,6 +1488,10 @@ footer strong {{ color:var(--text); }}
     <div class="ftitel">Alla ledamöter {_pil()}</div>
     <div class="ftext">Samtliga {antal_ledamoter} prognosticerade riksdagsledamöter</div>
   </a>
+  <a class="fkort" href="valresultat_2026.html">
+    <div class="ftitel">Valresultatet {_pil()}</div>
+    <div class="ftext">Utfallet mot prognosen och vilka som når majoritet</div>
+  </a>
   <a class="fkort" href="scenarier_2026.html">
     <div class="ftitel">Scenarier {_pil()}</div>
     <div class="ftext">Om L klarar spärren, om bara senaste veckan räknas, om valspurten upprepar sig</div>

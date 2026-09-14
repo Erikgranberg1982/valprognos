@@ -431,6 +431,13 @@ def main() -> None:
         except Exception as fel:
             print(f"  Partisidan kunde inte byggas: {fel}")
         try:
+            import resultatsida
+            slut = sorted((ROT / "slutprognos").glob("2026-*"))
+            if slut:
+                resultatsida.skriv(ROT / "output", slut[-1])
+        except Exception as fel:
+            print(f"  Resultatsidan kunde inte byggas: {fel}")
+        try:
             import scenariosida
             scenariosida.skriv(ROT / "output", res["snitt"], meta, df)
         except Exception as fel:

@@ -29,6 +29,7 @@ FILER = [
     "partier_2026.html",
     "ledamoter_2026.html",
     "scenarier_2026.html",
+    "valresultat_2026.html",
     "kandidater.json",
     "kommuner.json",
     "sitemap.xml",
