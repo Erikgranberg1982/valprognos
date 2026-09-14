@@ -52,9 +52,22 @@ def _norm(kod: str) -> str:
     return siffror.zfill(2) if len(siffror) <= 2 else siffror
 
 
+def _koalitioner() -> list:
+    try:
+        import lokala_koalitioner
+        return lokala_koalitioner.las()
+    except Exception:
+        return []
+
+
 def _bygg(niva: str, prognos: list, facitfil: Path) -> list:
     facit = {_norm(k): v for k, v in _facit(facitfil).items()}
     pk = {_norm(p.get("kod", "")): p for p in prognos}
+    try:
+        import lokala_koalitioner
+        styren = lokala_koalitioner.las_kommunstyren()
+    except Exception:
+        styren = {}
 
     ut = []
     for kod, partier in sorted(facit.items()):
@@ -90,11 +103,42 @@ def _bygg(niva: str, prognos: list, facitfil: Path) -> list:
 
         vanster = sum(mandat.get(q, 0) for q in cfg.BLOCK["vanster"])
         hoger = sum(mandat.get(q, 0) for q in cfg.BLOCK["hoger"])
+
+        # Vilka koalitioner som når majoritet med det faktiska resultatet.
+        # Ett styre är en politisk överenskommelse, så det här säger vad som
+        # är aritmetiskt möjligt, inte vad partierna vill.
+        koal = []
+        for k in _koalitioner():
+            delar = k["partier"]
+            if isinstance(delar, str):
+                delar = [d.strip() for d in delar.split("+")]
+            m = sum(mandat.get(d, 0) for d in delar)
+            koal.append({"n": k["namn"], "p": "+".join(delar), "m": m,
+                         "ja": m >= majoritet})
+        koal.sort(key=lambda x: -x["m"])
+
+        # Det sittande styret, som jämförelsepunkt: höll det efter valet?
+        styre = None
+        if niva == "kommun":
+            sitt = styren.get(kod)
+            if sitt:
+                # SKR skriver ÖP för lokala partier. Valresultatet har dem
+                # med egna förkortningar, så de summeras ihop.
+                lokalmandat = sum(m for q, m in mandat.items()
+                                  if q not in cfg.PARTIER)
+                m = sum(lokalmandat if q == "ÖP" else mandat.get(q, 0)
+                        for q in sitt["partier"])
+                styre = {"p": "+".join(
+                    sitt.get("lokalt_namn") or q if q == "ÖP" else q
+                    for q in sitt["partier"]),
+                    "m": m, "ja": m >= majoritet,
+                    "fore": sitt.get("majoritet", "")}
         ut.append({
             "kod": kod, "namn": namn, "niva": niva,
             "tot": totalt, "maj": majoritet,
             "v": vanster, "h": hoger, "o": totalt - vanster - hoger,
-            "rader": rader, "lokala": lokala,
+            "rader": rader, "lokala": lokala, "koal": koal,
+            "styre": styre,
             "mae": round(sum(fel) / len(fel), 2) if fel else None,
         })
     return ut
@@ -167,8 +211,12 @@ background:var(--kort);color:var(--text)}}
 border-radius:14px;padding:18px 20px;margin-bottom:12px;box-shadow:var(--skugga)}}
 .onamn{{font-size:18px;font-weight:700;letter-spacing:-.4px}}
 .ometa{{font-size:12.5px;color:var(--svag);margin-bottom:12px}}
+.oniva{{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;
+border-radius:20px;margin-left:9px;vertical-align:middle;
+background:var(--panel);color:var(--svag)}}
+.oniva.region{{background:rgba(0,61,99,.1);color:var(--text)}}
 .olage{{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;
-border-radius:20px;margin-left:8px;vertical-align:middle}}
+border-radius:20px;margin-left:6px;vertical-align:middle}}
 .olage.v{{background:rgba(238,32,32,.15);color:#c11}}
 .olage.h{{background:rgba(82,189,236,.2);color:#1a6b94}}
 .olage.o{{background:var(--korall-ljus);color:var(--korall-mork)}}
@@ -186,6 +234,17 @@ tr:last-child td{{border-bottom:none}}
 .pp{{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px}}
 tr.lokal td{{background:var(--panel)}}
 .tomt{{color:var(--svag);padding:30px 0;text-align:center}}
+.koalrub{{font-size:10px;text-transform:uppercase;letter-spacing:.9px;
+color:var(--svag);font-weight:700;margin:16px 0 8px}}
+.koallista{{display:flex;flex-wrap:wrap;gap:7px}}
+.krad{{display:flex;align-items:baseline;gap:7px;background:var(--panel);
+border-radius:9px;padding:5px 11px;font-size:12px}}
+.krad.ja{{background:rgba(125,186,116,.18)}}
+.kp{{font-weight:700}}
+.km{{font-variant-numeric:tabular-nums;font-weight:700}}
+.kt{{color:var(--svag);font-size:11px}}
+.krad.ja .kt{{color:#3f7a36;font-weight:600}}
+.krad.sitt{{border:1.5px solid var(--korall)}}
 @media(max-width:560px){{.dolj{{display:none}}}}
 </style></head><body>
 <header><div class="w">
@@ -229,8 +288,23 @@ function kort(o) {{
       '<td class="ta"><strong>' + l.m + '</strong></td>' +
       '<td class="ta dim dolj" colspan="3">lokalt parti, ingen egen prognos</td></tr>';
   }}).join('');
+  var sitt = o.styre ? '<div class="krad sitt' + (o.styre.ja ? ' ja' : '') +
+    '"><span class="kp">' + o.styre.p + '</span>' +
+    '<span class="km">' + o.styre.m + '</span>' +
+    '<span class="kt">' + (o.styre.ja ? 'majoritet' : (o.styre.m - o.maj)) +
+    ' · styr i dag</span></div>' : '';
+  var koal = sitt + (o.koal || []).map(function (k) {{
+    return '<div class="krad' + (k.ja ? ' ja' : '') + '">' +
+      '<span class="kp">' + k.p + '</span>' +
+      '<span class="km">' + k.m + '</span>' +
+      '<span class="kt">' + (k.ja ? 'majoritet' : (k.m - o.maj)) + '</span>' +
+      '</div>';
+  }}).join('');
   return '<div class="omrade">' +
     '<div class="onamn">' + o.namn +
+      '<span class="oniva ' + o.niva + '">' +
+      (o.niva === 'region' ? 'Regionfullmäktige' : 'Kommunfullmäktige') +
+      '</span>' +
       '<span class="olage ' + lage[0] + '">' + lage[1] + '</span></div>' +
     '<div class="ometa">' + o.tot + ' mandat, ' + o.maj + ' krävs för majoritet · ' +
       'vänster ' + o.v + ', höger ' + o.h + ', övriga ' + o.o +
@@ -239,7 +313,10 @@ function kort(o) {{
     '<table><thead><tr><th>Parti</th><th class="ta">Resultat</th>' +
     '<th class="ta">Mandat</th><th class="ta dolj">Prognos</th>' +
     '<th class="ta dolj">Mandat</th><th class="ta">Diff</th></tr></thead>' +
-    '<tbody>' + rader + lokala + '</tbody></table></div>';
+    '<tbody>' + rader + lokala + '</tbody></table>' +
+    (koal ? '<div class="koalrub">Möjliga majoriteter</div>' +
+            '<div class="koallista">' + koal + '</div>' : '') +
+    '</div>';
 }}
 
 function rita() {{
