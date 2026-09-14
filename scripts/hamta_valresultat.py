@@ -48,10 +48,16 @@ def hamta(sokvag: str, forsok: int = 3) -> dict | None:
 
 
 def _partirader(data: dict) -> tuple[dict, dict]:
-    """Procent och mandat per parti ur en resultatfil."""
+    """Procent och mandat per parti ur en resultatfil.
+
+    Lokala partier behålls med sin egen förkortning. Örebropartiet tog elva
+    av Örebros sextiofem mandat, och utan dem summerar kommunen till
+    femtiofyra: en jämförelse mot prognosen blir då meningslös.
+    """
     procent, mandat = {}, {}
     for post in data.get("partiMandat", []):
-        kod = PARTI.get(str(post.get("partiforkortning") or "").strip())
+        rakod = str(post.get("partiforkortning") or "").strip()
+        kod = PARTI.get(rakod, rakod)
         if kod:
             mandat[kod] = int(post.get("antalMandat") or 0)
     # Röstandelarna ligger under partiroster i två grupper: partier som
@@ -59,7 +65,8 @@ def _partirader(data: dict) -> tuple[dict, dict]:
     for grupp in ("rosterPaverkaMandat", "rosterEjPaverkaMandat"):
         block = data.get(grupp) or {}
         for post in block.get("partiroster", []):
-            kod = PARTI.get(str(post.get("partiforkortning") or "").strip())
+            rakod = str(post.get("partiforkortning") or "").strip()
+            kod = PARTI.get(rakod, rakod)
             if kod:
                 try:
                     procent[kod] = float(post.get("andelRoster") or 0)
@@ -97,7 +104,7 @@ def main() -> None:
         data = hamta(f"RF_{lanskod}_{suffix}")
         if data:
             pr, ma = _partirader(data)
-            for p in cfg.PARTIER:
+            for p in sorted(set(pr) | set(ma)):
                 reg.append({"omrade_kod": lanskod,
                             "omrade_namn": data.get("namn", ""),
                             "parti": p, "procent": pr.get(p, 0.0),
@@ -107,7 +114,7 @@ def main() -> None:
             if not kdata:
                 continue
             pr, ma = _partirader(kdata)
-            for p in cfg.PARTIER:
+            for p in sorted(set(pr) | set(ma)):
                 kom.append({"omrade_kod": kkod,
                             "omrade_namn": kdata.get("namn", ""),
                             "parti": p, "procent": pr.get(p, 0.0),

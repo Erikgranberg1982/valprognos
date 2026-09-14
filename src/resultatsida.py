@@ -104,6 +104,61 @@ def _nivablock(namn: str, d: dict, forklaring: str) -> str:
   </div>'''
 
 
+def _majoritetsblock() -> str:
+    """Majoritetslägen per region och kommun efter valet."""
+    import utvardering
+
+    delar = []
+    for niva, fil, rubrik, forklaring in (
+            ("region", "valresultat_region_2026.csv", "Regionfullmäktige",
+             "Tjugo regioner."),
+            ("kommun", "valresultat_kommun_2026.csv", "Kommunfullmäktige",
+             "290 kommuner.")):
+        d = utvardering.majoritetslage(ROT / "data" / fil)
+        if not d:
+            continue
+        n = len(d["omraden"])
+        kort = "".join(
+            f'<div class="lagekort"><div class="lagen">{d[k]}</div>'
+            f'<div class="lagee">{t}</div></div>'
+            for k, t in (("vanster", "med vänstermajoritet"),
+                         ("hoger", "med högermajoritet"),
+                         ("vagmastare", "där övriga är vågmästare")))
+
+        # Områden där ett lokalt parti eller ett block står ensamt avgörande.
+        vag = [o for o in d["omraden"] if o["lage"] == "ovriga_vagmastare"]
+        vag.sort(key=lambda o: -o["ovriga"])
+        rader = "".join(
+            f'<tr><td>{o["namn"]}</td>'
+            f'<td class="ta">{o["vanster"]}</td>'
+            f'<td class="ta">{o["hoger"]}</td>'
+            f'<td class="ta"><strong>{o["ovriga"]}</strong></td>'
+            f'<td class="dim">'
+            + ", ".join(f"{p} {m}" for p, m in sorted(
+                o["lokala"].items(), key=lambda x: -x[1])[:2])
+            + "</td></tr>" for o in vag[:10])
+
+        delar.append(f'''
+  <div class="nivakort">
+    <div class="nivarub">{rubrik}</div>
+    <div class="lagerad">{kort}</div>
+    <p class="fot">{forklaring} Räknat på det faktiska resultatet. Ett block
+    har majoritet när det ensamt når över hälften av mandaten. Där varken
+    vänster eller höger når dit avgör de övriga partierna, oftast ett lokalt
+    parti.</p>
+    {"<table><thead><tr><th>Vågmästarläge i</th><th class='ta'>Vänster</th>"
+     "<th class='ta'>Höger</th><th class='ta'>Övriga</th>"
+     "<th>Största lokala</th></tr></thead><tbody>" + rader + "</tbody></table>"
+     if rader else ""}
+  </div>''')
+
+    if not delar:
+        return ""
+    return ('<h2>Majoritetslägen</h2>'
+            '<div class="rub">Vilka som kan styra efter valet</div>'
+            '<div class="kort">' + "".join(delar) + '</div>')
+
+
 def skriv(katalog: Path, slutprognos: Path,
           regioner: list | None = None,
           kommuner: list | None = None) -> Path | None:
@@ -216,6 +271,8 @@ def skriv(katalog: Path, slutprognos: Path,
                          "flera procentenheter utan att synas i rikstrenden.")
             + '</div>')
 
+    majoritetshtml = _majoritetsblock()
+
     status = next(iter(resultat.values()))["status"]
     titel = "Valresultat 2026 mot prognosen"
     besk = (f"Riksdagsvalet 13 september 2026: S {resultat['S']['procent']:.1f} %, "
@@ -236,6 +293,7 @@ def skriv(katalog: Path, slutprognos: Path,
         basta_fel=f"{med_fel[0][1]:.2f}",
         l_sparr=f"{prognos.get('L', {}).get('over_sparr', 0) * 100:.0f}",
         lokalhtml=lokalhtml,
+        majoritetshtml=majoritetshtml,
         valdag=cfg.VALDAG,
     )
     katalog.mkdir(parents=True, exist_ok=True)
@@ -321,6 +379,9 @@ opacity:.5}}
 .nivarub{{font-size:16px;font-weight:700;margin-bottom:4px}}
 .tvakol{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
 gap:24px;margin-top:6px}}
+.lagerad{{display:flex;flex-wrap:wrap;gap:28px;margin:10px 0 4px}}
+.lagen{{font-size:30px;font-weight:800;letter-spacing:-1.2px;line-height:1.15}}
+.lagee{{font-size:12.5px;color:var(--svag)}}
 @media(max-width:640px){{.koalrad{{grid-template-columns:1fr 46px 78px}}
 .kbar{{display:none}}}}
 </style></head><body>
@@ -371,6 +432,8 @@ gap:24px;margin-top:6px}}
 </div>
 
 {lokalhtml}
+
+{majoritetshtml}
 
 <h2>Träffsäkerhet</h2>
 <div class="rub">Vilken variant kom närmast</div>

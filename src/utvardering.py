@@ -124,3 +124,67 @@ def riksniva(slutprognos: Path, facitfil: Path) -> dict:
                           "mandatdiff": dm})
     return {"partier": rader, "mae": float(np.mean(fel)),
             "mandatfel": mandatfel}
+
+
+# --- Majoritetslägen efter valet ------------------------------------------
+
+def majoritetslage(facitfil: Path, kommunstyren: dict | None = None) -> dict:
+    """Vilka som kan bilda majoritet i varje område efter valet.
+
+    Räknat på det faktiska resultatet. Ett styre är en politisk
+    överenskommelse, så det här säger vad som är aritmetiskt möjligt, inte
+    vad som kommer att hända. Lokala partier räknas med sina egna mandat.
+    """
+    facit = _las_facit(facitfil)
+    if not facit:
+        return {}
+
+    import lokala_koalitioner
+
+    ut = []
+    for kod, partier in facit.items():
+        mandat = {p: v["mandat"] for p, v in partier.items() if v["mandat"]}
+        totalt = sum(mandat.values())
+        if not totalt:
+            continue
+        majoritet = totalt // 2 + 1
+        namn = next(iter(partier.values())).get("namn", "")
+
+        # Blockens styrka, med lokala partier för sig.
+        vanster = sum(mandat.get(p, 0) for p in cfg.BLOCK["vanster"])
+        hoger = sum(mandat.get(p, 0) for p in cfg.BLOCK["hoger"])
+        ovriga = totalt - vanster - hoger
+
+        # Vilka av de vanliga koalitionerna som räcker.
+        racker = []
+        for k in lokala_koalitioner.las():
+            delar = k["partier"]
+            if isinstance(delar, str):
+                delar = [d.strip() for d in delar.split("+")]
+            m = sum(mandat.get(d, 0) for d in delar)
+            if m >= majoritet:
+                racker.append({"namn": k["namn"],
+                               "partier": "+".join(delar), "mandat": m})
+        racker.sort(key=lambda x: x["mandat"])
+
+        ut.append({
+            "kod": kod, "namn": namn, "totalt": totalt,
+            "majoritet": majoritet, "vanster": vanster, "hoger": hoger,
+            "ovriga": ovriga,
+            "lokala": {p: m for p, m in mandat.items()
+                       if p not in cfg.PARTIER and m},
+            "racker": racker,
+            "lage": ("vanster" if vanster >= majoritet
+                     else ("hoger" if hoger >= majoritet
+                           else ("ovriga_vagmastare" if ovriga
+                                 and vanster + ovriga >= majoritet
+                                 and hoger + ovriga >= majoritet
+                                 else "ingen"))),
+        })
+    ut.sort(key=lambda o: o["namn"])
+    return {"omraden": ut,
+            "vanster": sum(1 for o in ut if o["lage"] == "vanster"),
+            "hoger": sum(1 for o in ut if o["lage"] == "hoger"),
+            "vagmastare": sum(1 for o in ut
+                              if o["lage"] == "ovriga_vagmastare"),
+            "ingen": sum(1 for o in ut if o["lage"] == "ingen")}
