@@ -42,13 +42,17 @@ tjugoen dagars halveringstid vägde in augustimätningar som hann bli inaktuella
 
 ## Scenarierna
 
-| Variant | MAE | Felplacerade mandat |
+Rangordnat på medelabsolutfel i procent, inte på mandat. Ett parti nära
+spärren ger nitton mandats utslag oavsett hur nära procenttalet låg, vilket
+skulle låta Liberalerna ensamt avgöra hela rangordningen.
+
+| Variant | MAE | Mandat i fel parti |
 |---|---|---|
-| **Liberalerna klarar spärren** | 0,97 | **24** |
 | **Bara den senaste veckan** | **0,96** | 26 |
-| Sommartrenden håller i sig | 1,26 | 36 |
-| Huvudprognosen | 1,18 | 50 |
+| Liberalerna klarar spärren | 0,97 | 24 |
 | Örebropartiet in via valkretsen | 1,14 | 50 |
+| Huvudprognosen | 1,18 | 50 |
+| Sommartrenden håller i sig | 1,26 | 36 |
 | Samma valspurt som 2022 | 1,41 | 52 |
 | Genomsnittlig valspurt | 1,43 | 54 |
 
@@ -60,6 +64,24 @@ femtio till tjugosex. Det är värt att notera mot backtestet som gjordes före
 valet: mot 2018 och 2022 gav kortare tidsfönster **högre** fel, vilket var
 skälet att behålla tjugoen dagar. I valet 2026 gällde motsatsen, eftersom
 slutveckan innehöll en ovanligt snabb rörelse.
+
+## Region och kommun
+
+| Nivå | Medelfel | Median | Områden |
+|---|---|---|---|
+| Riksdagen | 1,18 | – | 1 |
+| Regionfullmäktige | 1,32 | 1,29 | 20 |
+| Kommunfullmäktige | 2,15 | 1,91 | 290 |
+
+Felen växer nedåt som väntat. Riksprognosen bygger på opinionsmätningar,
+medan region och kommun härleds ur områdets eget resultat i förra valet skalat
+med rikstrenden. Kalibreringen före valet gav 1,49 för region och 1,95 för
+kommun, så utfallet ligger nära det modellen själv angav.
+
+Spridningen mellan kommuner är stor. Arboga landade på 0,36 procentenheter,
+medan Sorsele hamnade 9,59 fel. De sämsta är genomgående små kommuner, där ett
+lokalt parti eller en enskild kandidat kan flytta flera procentenheter utan att
+synas i rikstrenden.
 
 ## Blocken
 

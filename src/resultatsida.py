@@ -60,7 +60,53 @@ def las_scenarier(katalog: Path) -> dict:
     return ut
 
 
-def skriv(katalog: Path, slutprognos: Path) -> Path | None:
+def _lokala_niva(regioner: list, kommuner: list) -> dict:
+    """Utvärderar region- och kommunprognosen mot utfallet."""
+    import utvardering
+    return {
+        "region": utvardering.utvardera_niva(
+            regioner, ROT / "data" / "valresultat_region_2026.csv"),
+        "kommun": utvardering.utvardera_niva(
+            kommuner, ROT / "data" / "valresultat_kommun_2026.csv"),
+    }
+
+
+def _nivablock(namn: str, d: dict, forklaring: str) -> str:
+    if not d:
+        return ""
+    lista = lambda rader: "".join(
+        f'<tr><td>{o["namn"]}</td><td class="ta">{o["mae"]:.2f}</td>'
+        f'<td class="ta dim">{o["mandatfel"]}</td></tr>' for o in rader)
+    return f'''
+  <div class="nivakort">
+    <div class="nivarub">{namn}</div>
+    <div class="nyckel">
+      <div><div class="n">{d["mae"]:.2f}</div>
+        <div class="e">procentenheters medelfel</div></div>
+      <div><div class="n">{d["median"]:.2f}</div>
+        <div class="e">median</div></div>
+      <div><div class="n">{d["antal"]}</div>
+        <div class="e">områden</div></div>
+    </div>
+    <p class="fot">{forklaring}</p>
+    <div class="tvakol">
+      <div>
+        <table><thead><tr><th>Träffade bäst</th><th class="ta">pe</th>
+        <th class="ta">mandat</th></tr></thead>
+        <tbody>{lista(d["basta"])}</tbody></table>
+      </div>
+      <div>
+        <table><thead><tr><th>Träffade sämst</th><th class="ta">pe</th>
+        <th class="ta">mandat</th></tr></thead>
+        <tbody>{lista(d["samsta"])}</tbody></table>
+      </div>
+    </div>
+  </div>'''
+
+
+def skriv(katalog: Path, slutprognos: Path,
+          regioner: list | None = None,
+          kommuner: list | None = None) -> Path | None:
     resultat = las_resultat()
     if not resultat:
         return None
@@ -130,14 +176,36 @@ def skriv(katalog: Path, slutprognos: Path) -> Path | None:
         f_mand = sum(abs(varden[p]["mandat"] - resultat[p]["mandat"])
                      for p in cfg.PARTIER if p in varden)
         med_fel.append((namn, sum(f_stod) / len(f_stod), f_mand))
-    med_fel.sort(key=lambda x: x[2])
+    med_fel.sort(key=lambda x: x[1])
     for i, (namn, fel, fm) in enumerate(med_fel):
         klass = " basta" if i == 0 else (
             " huvud" if namn == "Huvudprognosen" else "")
         srader.append(
             f'<tr class="{klass.strip()}"><td>{namn}</td>'
-            f'<td class="ta">{fel:.2f}</td>'
-            f'<td class="ta"><strong>{fm}</strong></td></tr>')
+            f'<td class="ta"><strong>{fel:.2f}</strong></td>'
+            f'<td class="ta dim">{fm}</td></tr>')
+
+    # Region och kommun, om prognosdatan finns.
+    lokalt = _lokala_niva(regioner or [], kommuner or [])
+    lokalhtml = ""
+    if lokalt.get("region") or lokalt.get("kommun"):
+        lokalhtml = (
+            '<h2>Region och kommun</h2>'
+            '<div class="rub">Hur väl träffade de lokala prognoserna</div>'
+            '<div class="kort">'
+            '<p class="besk">Riksprognosen bygger på opinionsmätningar. För '
+            'region och kommun finns nästan inga mätningar, så de härleds ur '
+            'områdets eget resultat i förra valet skalat med rikstrenden. '
+            'Felen är därför väntat större.</p>'
+            + _nivablock("Regionfullmäktige", lokalt.get("region", {}),
+                         "Tjugo regioner. Samma metod som kommunerna, men "
+                         "med SCB:s partisympatiundersökning som extra "
+                         "underlag.")
+            + _nivablock("Kommunfullmäktige", lokalt.get("kommun", {}),
+                         "290 kommuner. Små kommuner är svårast: där kan "
+                         "ett lokalt parti eller en enskild kandidat flytta "
+                         "flera procentenheter utan att synas i rikstrenden.")
+            + '</div>')
 
     status = next(iter(resultat.values()))["status"]
     titel = "Valresultat 2026 mot prognosen"
@@ -156,8 +224,9 @@ def skriv(katalog: Path, slutprognos: Path) -> Path | None:
         mandatfel=mandatfel,
         status=status,
         basta=med_fel[0][0],
-        basta_fel=med_fel[0][2],
+        basta_fel=f"{med_fel[0][1]:.2f}",
         l_sparr=f"{prognos.get('L', {}).get('over_sparr', 0) * 100:.0f}",
+        lokalhtml=lokalhtml,
         valdag=cfg.VALDAG,
     )
     katalog.mkdir(parents=True, exist_ok=True)
@@ -232,6 +301,11 @@ opacity:.5}}
 .nyckel{{display:flex;flex-wrap:wrap;gap:34px;margin:6px 0 4px}}
 .nyckel .n{{font-size:34px;font-weight:800;letter-spacing:-1.4px;line-height:1.15}}
 .nyckel .e{{font-size:12.5px;color:var(--svag)}}
+.nivakort{{border-top:1px solid var(--linje);padding-top:20px;margin-top:22px}}
+.nivakort:first-of-type{{border-top:none;padding-top:0;margin-top:14px}}
+.nivarub{{font-size:16px;font-weight:700;margin-bottom:4px}}
+.tvakol{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+gap:24px;margin-top:6px}}
 @media(max-width:640px){{.koalrad{{grid-template-columns:1fr 46px 78px}}
 .kbar{{display:none}}}}
 </style></head><body>
@@ -271,16 +345,20 @@ opacity:.5}}
   egen majoritet.</p>
 </div>
 
+{lokalhtml}
+
 <h2>Träffsäkerhet</h2>
 <div class="rub">Vilken variant kom närmast</div>
 <div class="kort">
   <p class="besk">Sidan publicerade sex scenarier vid sidan av huvudprognosen.
-  Här rangordnas de efter hur många mandat de placerade fel.
-  <strong>{basta}</strong> träffade bäst med {basta_fel} felplacerade
-  mandat.</p>
+  Här rangordnas de efter medelabsolutfelet i procent, inte efter mandat:
+  ett parti som ligger nära spärren ger nitton mandats utslag oavsett hur
+  nära procenttalet låg, vilket skulle låta Liberalerna avgöra hela
+  rangordningen. <strong>{basta}</strong> träffade bäst med {basta_fel}
+  procentenheters medelfel.</p>
   <table>
     <thead><tr><th>Variant</th><th class="ta">Medelfel, pe</th>
-    <th class="ta">Felplacerade mandat</th></tr></thead>
+    <th class="ta">Mandat i fel parti</th></tr></thead>
     <tbody>{srader}</tbody>
   </table>
   <p class="fot">De två bästa varianterna byggde båda på att de färskaste

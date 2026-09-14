@@ -434,7 +434,21 @@ def main() -> None:
             import resultatsida
             slut = sorted((ROT / "slutprognos").glob("2026-*"))
             if slut:
-                resultatsida.skriv(ROT / "output", slut[-1])
+                # Områdesdatan ligger färdigpaketerad i den byggda sidan.
+                import json as _json
+                import re as _re
+                _h = (ROT / "output" / "index.html").read_text(
+                    encoding="utf-8")
+                _m = _re.search(r"const LOKAL = (\{.*?\});", _h, _re.S)
+                _d = _json.loads(_m.group(1)) if _m else {}
+                _kom = _json.loads(
+                    (ROT / "output" / "kommuner.json").read_text(
+                        encoding="utf-8"))
+                if isinstance(_kom, dict):
+                    _kom = _kom.get("kommuner", [])
+                resultatsida.skriv(ROT / "output", slut[-1],
+                                   regioner=_d.get("region", []),
+                                   kommuner=_kom)
         except Exception as fel:
             print(f"  Resultatsidan kunde inte byggas: {fel}")
         try:
