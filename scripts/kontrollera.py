@@ -141,7 +141,8 @@ def main() -> None:
                          ("ledamoter_2026.html", 20),
                          ("scenarier_2026.html", 10),
                          ("prognos_2026.html", 40),
-                         ("index.html", 8)):
+                         ("index.html", 8),
+                         ("omraden_2026.html", 100)):
         sida = ROT / "output" / namn
         if not sida.exists():
             fel(f"{namn} saknas. Undersidan byggdes inte.")

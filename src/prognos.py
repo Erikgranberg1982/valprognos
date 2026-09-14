@@ -452,6 +452,11 @@ def main() -> None:
         except Exception as fel:
             print(f"  Resultatsidan kunde inte byggas: {fel}")
         try:
+            import omradessida
+            omradessida.skriv(ROT / "output")
+        except Exception as fel:
+            print(f"  Områdessidan kunde inte byggas: {fel}")
+        try:
             import scenariosida
             scenariosida.skriv(ROT / "output", res["snitt"], meta, df)
         except Exception as fel:

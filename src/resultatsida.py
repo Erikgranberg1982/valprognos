@@ -156,7 +156,12 @@ def _majoritetsblock() -> str:
         return ""
     return ('<h2>Majoritetslägen</h2>'
             '<div class="rub">Vilka som kan styra efter valet</div>'
-            '<div class="kort">' + "".join(delar) + '</div>')
+            '<div class="kort">' + "".join(delar)
+            + '<p class="fot" style="margin-top:18px">'
+              'Tabellerna visar de tio största. '
+              '<a href="omraden_2026.html">Slå upp din egen kommun eller '
+              'region</a> för mandat per parti och hur nära prognosen låg.'
+              '</p></div>')
 
 
 def skriv(katalog: Path, slutprognos: Path,
@@ -389,6 +394,7 @@ gap:24px;margin-top:6px}}
 <h1>Valresultatet mot prognosen</h1>
 <div class="sub">Riksdagsvalet {valdag} · {status}</div>
 <div class="lankrad">
+  <a href="omraden_2026.html">Din kommun</a>
   <a href="prognos_2026.html">Prognosen</a>
   <a href="partier_2026.html">Parti för parti</a>
   <a href="ledamoter_2026.html">Ledamöterna</a>
