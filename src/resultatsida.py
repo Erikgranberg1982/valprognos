@@ -123,7 +123,15 @@ def skriv(katalog: Path, slutprognos: Path,
         dm = p.get("mandat", 0) - r["mandat"]
         fel_stod.append(abs(ds))
         fel_mandat.append(abs(dm))
-        kl = "ned" if dm < 0 else ("upp" if dm > 0 else "noll")
+        # Diffen visas i procentenheter. Mandat är en trappa: ett parti som
+        # ligger en tiondel fel nära spärren hoppar nitton mandat, vilket
+        # säger mer om spärren än om prognosen.
+        #
+        # Färgen följer felets storlek, inte dess riktning. En överskattning
+        # är varken bättre eller sämre än en underskattning, så grönt betyder
+        # att prognosen låg nära och rött att den låg långt ifrån.
+        kl = ("traff" if abs(ds) < 1.0
+              else ("miss" if abs(ds) >= 2.0 else "noll"))
         rader.append(
             f'<tr><td><span class="pp" style="background:'
             f'{cfg.PARTIFARG[parti]}"></span>{cfg.PARTINAMN[parti]}</td>'
@@ -131,7 +139,8 @@ def skriv(katalog: Path, slutprognos: Path,
             f'<td class="ta"><strong>{r["mandat"]}</strong></td>'
             f'<td class="ta dim">{p.get("stod", 0):.1f} %</td>'
             f'<td class="ta dim">{p.get("mandat", 0)}</td>'
-            f'<td class="ta {kl}">{dm:+d}</td></tr>')
+            f'<td class="ta {kl}">{ds:+.1f}</td>'
+            f'<td class="ta dim">{dm:+d}</td></tr>')
 
     mae = sum(fel_stod) / len(fel_stod)
     mandatfel = sum(fel_mandat)
@@ -216,7 +225,7 @@ def skriv(katalog: Path, slutprognos: Path,
 
     html = _MALL.format(
         ga=cfg.google_analytics(),
-        seo_taggar=seo.metataggar(titel, besk, "valresultat_2026.html"),
+        seo_taggar=seo.metataggar(titel, besk, "index.html"),
         rader="".join(rader),
         krader="".join(krader),
         srader="".join(srader),
@@ -230,7 +239,8 @@ def skriv(katalog: Path, slutprognos: Path,
         valdag=cfg.VALDAG,
     )
     katalog.mkdir(parents=True, exist_ok=True)
-    ut = katalog / "valresultat_2026.html"
+    ut = katalog / "index.html"
+    (katalog / "valresultat_2026.html").write_text(html, encoding="utf-8")
     ut.write_text(html, encoding="utf-8")
     return ut
 
@@ -261,6 +271,11 @@ font-weight:600;color:var(--korall);text-decoration:none;margin-bottom:12px;
 padding:5px 11px 5px 8px;border:1px solid rgba(0,0,0,.12);
 border-radius:99px;background:var(--panel);transition:.15s}}
 .tbaka:hover{{background:var(--korall);color:#fff;border-color:var(--korall)}}
+.lankrad{{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}}
+.lankrad a{{font-size:12.5px;font-weight:600;color:var(--korall);
+text-decoration:none;padding:5px 13px;border:1px solid rgba(0,0,0,.12);
+border-radius:99px;background:var(--kort);transition:.15s}}
+.lankrad a:hover{{background:var(--korall);color:#fff;border-color:var(--korall)}}
 h2{{font-size:11.5px;text-transform:uppercase;letter-spacing:1.5px;
 color:var(--svag);font-weight:700;margin:34px 0 3px}}
 .rub{{font-size:23px;font-weight:700;letter-spacing:-.6px;margin:0 0 16px}}
@@ -276,9 +291,9 @@ td{{padding:9px 9px 9px 0;border-bottom:1px solid var(--linje)}}
 tr:last-child td{{border-bottom:none}}
 .ta{{text-align:right;font-variant-numeric:tabular-nums}}
 .dim{{color:var(--svag)}}
-.upp{{color:var(--gron);font-weight:700}}
-.ned{{color:var(--korall);font-weight:700}}
-.noll{{color:var(--svag)}}
+.traff{{color:var(--gron);font-weight:700}}
+.miss{{color:var(--korall);font-weight:700}}
+.noll{{color:var(--text);font-weight:600}}
 .pp{{display:inline-block;width:10px;height:10px;border-radius:3px;
 margin-right:8px}}
 tr.basta td{{background:rgba(125,186,116,.14);font-weight:600}}
@@ -310,9 +325,14 @@ gap:24px;margin-top:6px}}
 .kbar{{display:none}}}}
 </style></head><body>
 <header><div class="w">
-<a class="tbaka" href="index.html"><span>&#8592;</span> Till prognosen</a>
 <h1>Valresultatet mot prognosen</h1>
 <div class="sub">Riksdagsvalet {valdag} · {status}</div>
+<div class="lankrad">
+  <a href="prognos_2026.html">Prognosen</a>
+  <a href="partier_2026.html">Parti för parti</a>
+  <a href="ledamoter_2026.html">Ledamöterna</a>
+  <a href="scenarier_2026.html">Scenarierna</a>
+</div>
 </div></header>
 <div class="w">
 
@@ -326,10 +346,15 @@ gap:24px;margin-top:6px}}
   <table>
     <thead><tr><th>Parti</th><th class="ta">Resultat</th><th class="ta">Mandat</th>
     <th class="ta">Prognos</th><th class="ta">Prognos</th>
-    <th class="ta">Diff</th></tr></thead>
+    <th class="ta">Diff, pe</th><th class="ta">Mandat</th></tr></thead>
     <tbody>{rader}</tbody>
   </table>
-  <p class="fot">Prognosen är den som frystes två dagar före valet. Liberalerna
+  <p class="fot">Diffen är prognosen minus utfallet i procentenheter, så ett
+  positivt tal betyder att modellen låg för högt. Grönt är under en
+  procentenhets fel, rött två eller mer. Mandatkolumnen längst till höger
+  visar samma sak i mandat, men den är trubbig: ett parti nära spärren
+  hoppar nitton mandat på någon tiondels procent.
+  Prognosen är den som frystes två dagar före valet. Liberalerna
   är det stora felet: modellen gav {l_sparr} procents sannolikhet att partiet
   skulle klara spärren och noll mandat i punktskattningen, men utfallet blev
   nitton mandat.</p>

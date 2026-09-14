@@ -26,6 +26,7 @@ VARD = "46.246.49.209"
 # publicering/ är källdata för granskning och läses inte av någon sida.
 FILER = [
     "index.html",
+    "prognos_2026.html",
     "partier_2026.html",
     "ledamoter_2026.html",
     "scenarier_2026.html",

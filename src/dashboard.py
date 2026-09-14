@@ -838,8 +838,8 @@ def bygg(sammanfattning: pd.DataFrame, block: dict, regeringar: pd.DataFrame,
     import seo
     _titel = f"Valprognos {cfg.VALDAG[:4]} · riksdag, region och kommun"
     _besk = seo.riks_beskrivning(sammanfattning, meta, block)
-    seo_taggar = seo.metataggar(_titel, _besk, "index.html")
-    seo_data = seo.strukturerad_data(_titel, _besk, "index.html", meta)
+    seo_taggar = seo.metataggar(_titel, _besk, "prognos_2026.html")
+    seo_data = seo.strukturerad_data(_titel, _besk, "prognos_2026.html", meta)
 
     return f"""<!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
@@ -1451,6 +1451,7 @@ footer strong {{ color:var(--text); }}
 </div></div>
 
 <div class="hero"><div class="heroinner">
+  <a class="tbakares" href="index.html">&#8592; Till valresultatet</a>
   <span class="etikett">Valprognos</span>
   <h1>Valet 2026</h1>
   <p class="ingress">Prognos för alla tre val: riksdag, region och kommun.
@@ -2771,17 +2772,20 @@ window.addEventListener('resize', () => {{
 
 def spara(html: str, kommun_json: str | None = None,
           kandidat_json: str | None = None) -> Path:
-    """Skriver sidan till output/.
+    """Skriver prognossidan till output/.
 
-    Filen heter index.html eftersom statisk hosting som GitHub Pages hämtar den
-    automatiskt på rotadressen. En kopia sparas som prognos.html för den som är
-    van vid det namnet lokalt.
+    Efter valet är resultatsidan startsida, eftersom utfallet är det som är
+    aktuellt. Prognosen ligger kvar på prognos_2026.html, och index.html
+    skrivs bara här om resultatsidan inte kunde byggas. Kopian prognos.html
+    finns kvar för äldre länkar.
     """
     katalog = ROT / "output"
     katalog.mkdir(parents=True, exist_ok=True)
-    ut = katalog / "index.html"
+    ut = katalog / "prognos_2026.html"
     ut.write_text(html, encoding="utf-8")
     (katalog / "prognos.html").write_text(html, encoding="utf-8")
+    if not (ROT / "data" / "valresultat_2026.csv").exists():
+        (katalog / "index.html").write_text(html, encoding="utf-8")
     # Kommundata bäddas in komprimerad i sidan, så någon separat fil behövs
     # inte. Den skrivs ändå ut för den som vill använda datan för egen analys.
     if kommun_json and kommun_json != "[]":

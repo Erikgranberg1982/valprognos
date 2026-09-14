@@ -139,7 +139,9 @@ def main() -> None:
     # ger en startsida med länkar som leder till ingenting.
     for namn, minsta in (("partier_2026.html", 20),
                          ("ledamoter_2026.html", 20),
-                         ("scenarier_2026.html", 10)):
+                         ("scenarier_2026.html", 10),
+                         ("prognos_2026.html", 40),
+                         ("index.html", 8)):
         sida = ROT / "output" / namn
         if not sida.exists():
             fel(f"{namn} saknas. Undersidan byggdes inte.")
@@ -151,7 +153,8 @@ def main() -> None:
     # mätningens datum och frös därför så snart mätningarna glesnade.
     import re as _re
     vantat = (pd.Timestamp(_cfg_datum.VALDAG) - pd.Timestamp.now().normalize()).days
-    for namn in ("index.html", "partier_2026.html", "scenarier_2026.html"):
+    for namn in ("prognos_2026.html", "partier_2026.html",
+                 "scenarier_2026.html"):
         sida = ROT / "output" / namn
         if not sida.exists():
             continue
@@ -180,7 +183,8 @@ def main() -> None:
         fel(f"kommuner.json innehåller {len(krader)} kommuner, väntat 290. "
             "SCB kan ha brutit anslutningen under bygget.")
 
-    sida_txt = (ROT / "output" / "index.html").read_text(encoding="utf-8")
+    sida_txt = (ROT / "output" / "prognos_2026.html").read_text(
+        encoding="utf-8")
     m_antal = _re.search(r'"kommun_antal":\s*(\d+)', sida_txt)
     if m_antal and int(m_antal.group(1)) < 250:
         fel(f"index.html bäddar in {m_antal.group(1)} kommuner, väntat 290.")
